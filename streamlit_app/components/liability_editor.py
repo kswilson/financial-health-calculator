@@ -21,7 +21,7 @@ def render_liability_editor(liabilities: list[Liability]) -> list[Liability]:
     if updated_liabilities:
         for i, liability in enumerate(updated_liabilities):
             with st.expander(
-                f"{liability.name} - ${liability.annual_amount:,.0f}/year",
+                f"{liability.name} - £{liability.annual_amount:,.0f}/year",
                 expanded=False,
             ):
                 col1, col2 = st.columns(2)
@@ -33,7 +33,7 @@ def render_liability_editor(liabilities: list[Liability]) -> list[Liability]:
                         key=f"liability_name_{i}",
                     )
                     new_amount = st.number_input(
-                        "Annual Amount ($)",
+                        "Annual Amount (£)",
                         value=int(liability.annual_amount),
                         min_value=0,
                         step=1000,
@@ -110,8 +110,8 @@ def render_liability_editor(liabilities: list[Liability]) -> list[Liability]:
     discretionary = sum(l.annual_amount for l in updated_liabilities if not l.is_essential)
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Essential Spending", f"${essential:,.0f}/year")
-    col2.metric("Discretionary", f"${discretionary:,.0f}/year")
-    col3.metric("Total Spending", f"${essential + discretionary:,.0f}/year")
+    col1.metric("Essential Spending", f"£{essential:,.0f}/year")
+    col2.metric("Discretionary", f"£{discretionary:,.0f}/year")
+    col3.metric("Total Spending", f"£{essential + discretionary:,.0f}/year")
 
     return updated_liabilities

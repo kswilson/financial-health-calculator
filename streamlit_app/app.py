@@ -58,13 +58,13 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.metric(
         "Total Assets",
-        f"${household.total_assets:,.0f}",
+        f"£{household.total_assets:,.0f}",
     )
 
 with col2:
     st.metric(
         "Annual Spending Target",
-        f"${household.total_spending:,.0f}",
+        f"£{household.total_spending:,.0f}",
     )
 
 with col3:

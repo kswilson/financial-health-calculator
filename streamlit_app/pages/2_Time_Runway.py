@@ -102,7 +102,7 @@ with tab1:
         years=years,
         percentiles=result.wealth_percentiles,
         title="Portfolio Value Projection",
-        y_label="Portfolio Value ($)",
+        y_label="Portfolio Value (£)",
         show_floor=0,
     )
     st.plotly_chart(wealth_fig, use_container_width=True)
@@ -203,9 +203,9 @@ with st.expander("Understanding the Results"):
     st.markdown(f"""
     ### Simulation Summary
 
-    - **Initial Portfolio**: ${initial_wealth:,.0f}
-    - **Annual Spending**: ${annual_spending:,.0f} ({withdrawal_rate:.2f}% withdrawal rate)
-    - **Essential Spending Floor**: ${spending_floor:,.0f}
+    - **Initial Portfolio**: £{initial_wealth:,.0f}
+    - **Annual Spending**: £{annual_spending:,.0f} ({withdrawal_rate:.2f}% withdrawal rate)
+    - **Essential Spending Floor**: £{spending_floor:,.0f}
     - **Stock Allocation**: {stock_allocation}%
     - **Planning Horizon**: {n_years} years
 

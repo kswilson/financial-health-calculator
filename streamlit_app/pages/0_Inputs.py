@@ -1,3 +1,4 @@
+# UK version — first customisation
 """Inputs page for asset, liability, and assumption entry."""
 
 import sys
@@ -5,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import streamlit as st
+from pydantic import TypeAdapter
 
 from fundedness.models.household import Household, Person
 from fundedness.models.market import MarketModel
@@ -71,13 +73,13 @@ with tab1:
                 max_value=70,
             )
             ss_annual = st.number_input(
-                "Expected Annual Social Security ($)",
+                "Expected Annual Social Security (£)",
                 value=int(member.social_security_annual),
                 min_value=0,
                 step=1000,
             )
             pension = st.number_input(
-                "Annual Pension ($)",
+                "Annual Pension (£)",
                 value=int(member.pension_annual),
                 min_value=0,
                 step=1000,
@@ -234,13 +236,42 @@ with tab4:
         state_ltcg_rate=state_rate,
     )
 
+# Save / Load scenario
+st.divider()
+st.subheader("💾 Save / Load Scenario")
+
+col_save, col_load = st.columns(2)
+
+with col_save:
+    st.download_button(
+        label="💾 Download my full situation as JSON",
+        data=household.model_dump_json(indent=2),
+        file_name="my_uk_retirement_scenario.json",
+        mime="application/json",
+    )
+
+with col_load:
+    uploaded = st.file_uploader(
+        "📤 Load previous scenario",
+        type=["json"],
+        key="scenario_upload",
+    )
+    if uploaded is not None:
+        try:
+            loaded = TypeAdapter(Household).validate_json(uploaded.read())
+            update_household(loaded)
+            st.success("Scenario loaded successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Invalid scenario file: {e}")
+
 # Summary
 st.divider()
 st.subheader("Summary")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Assets", f"${household.total_assets:,.0f}")
-col2.metric("Annual Spending", f"${household.total_spending:,.0f}")
+col1.metric("Total Assets", f"£{household.total_assets:,.0f}")
+col2.metric("Annual Spending", f"£{household.total_spending:,.0f}")
 col3.metric("Planning Horizon", f"{household.planning_horizon} years")
 col4.metric("Withdrawal Rate", f"{household.total_spending / household.total_assets * 100:.1f}%" if household.total_assets > 0 else "N/A")

@@ -9,10 +9,16 @@ from pydantic import BaseModel, Field, field_validator
 class AccountType(str, Enum):
     """Tax treatment of an account."""
 
+    # US account types
     TAXABLE = "taxable"
     TAX_DEFERRED = "tax_deferred"  # Traditional IRA, 401(k)
     TAX_EXEMPT = "tax_exempt"  # Roth IRA, Roth 401(k)
     HSA = "hsa"
+
+    # UK account types
+    ISA = "isa"  # Stocks & Shares ISA (tax-exempt)
+    SIPP = "sipp"  # Self-Invested Personal Pension (tax-deferred, 25% tax-free lump sum)
+    GENERAL = "general"  # General Investment Account (taxable)
 
 
 class AssetClass(str, Enum):

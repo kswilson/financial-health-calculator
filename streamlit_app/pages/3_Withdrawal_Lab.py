@@ -161,7 +161,7 @@ with tab1:
         strategies=wealth_data,
         metric="wealth_median",
         title="Median Wealth Over Time",
-        y_label="Portfolio Value ($)",
+        y_label="Portfolio Value (£)",
     )
     st.plotly_chart(wealth_fig, use_container_width=True)
 
@@ -176,7 +176,7 @@ with tab2:
         strategies=spending_data,
         metric="spending_median",
         title="Median Spending Over Time",
-        y_label="Annual Spending ($)",
+        y_label="Annual Spending (£)",
     )
     st.plotly_chart(spending_fig, use_container_width=True)
 

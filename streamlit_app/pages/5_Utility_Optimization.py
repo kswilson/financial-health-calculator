@@ -75,7 +75,7 @@ with st.sidebar:
     ) / 100
 
     subsistence_floor = st.number_input(
-        "Subsistence Floor ($)",
+        "Subsistence Floor (£)",
         min_value=0,
         max_value=200000,
         value=int(spending_floor),
@@ -151,7 +151,7 @@ with col4:
     initial_spending = initial_wealth * optimal.optimal_spending_rate
     st.metric(
         "Year 1 Spending",
-        f"${initial_spending:,.0f}",
+        f"£{initial_spending:,.0f}",
         help="Based on current wealth",
     )
 
@@ -261,16 +261,16 @@ with tab2:
     with col1:
         st.markdown("### Merton Optimal")
         st.metric("Expected Utility", f"{merton_result.expected_lifetime_utility:.2e}")
-        st.metric("CE Consumption", f"${merton_result.certainty_equivalent_consumption:,.0f}/yr")
+        st.metric("CE Consumption", f"£{merton_result.certainty_equivalent_consumption:,.0f}/yr")
         st.metric("Success Rate", f"{merton_result.success_rate:.1%}")
-        st.metric("Median Terminal Wealth", f"${merton_result.median_terminal_wealth:,.0f}")
+        st.metric("Median Terminal Wealth", f"£{merton_result.median_terminal_wealth:,.0f}")
 
     with col2:
         st.markdown("### Fixed 4% / 60-40")
         st.metric("Expected Utility", f"{fixed_result.expected_lifetime_utility:.2e}")
-        st.metric("CE Consumption", f"${fixed_result.certainty_equivalent_consumption:,.0f}/yr")
+        st.metric("CE Consumption", f"£{fixed_result.certainty_equivalent_consumption:,.0f}/yr")
         st.metric("Success Rate", f"{fixed_result.success_rate:.1%}")
-        st.metric("Median Terminal Wealth", f"${fixed_result.median_terminal_wealth:,.0f}")
+        st.metric("Median Terminal Wealth", f"£{fixed_result.median_terminal_wealth:,.0f}")
 
     # Utility comparison chart
     util_fig = create_utility_comparison_chart(
@@ -370,7 +370,7 @@ with tab4:
         **Your Preferences:**
         - Risk Aversion (gamma): {gamma}
         - Time Preference: {time_preference:.1%}
-        - Subsistence Floor: ${subsistence_floor:,}
+        - Subsistence Floor: £{subsistence_floor:,}
         """)
 
     st.markdown("---")
@@ -417,9 +417,9 @@ with tab4:
         st.markdown(f"""
         Near the subsistence floor, you can't afford to take risk:
 
-        - $W$ = current wealth = ${initial_wealth:,}
-        - $F$ = subsistence floor = ${subsistence_floor:,}
-        - Distance from floor: ${initial_wealth - subsistence_floor:,}
+        - $W$ = current wealth = £{initial_wealth:,}
+        - $F$ = subsistence floor = £{subsistence_floor:,}
+        - Distance from floor: £{initial_wealth - subsistence_floor:,}
 
         Adjustment factor: {(initial_wealth - subsistence_floor) / initial_wealth:.1%}
 

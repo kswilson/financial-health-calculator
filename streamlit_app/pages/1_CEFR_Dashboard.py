@@ -74,11 +74,11 @@ if cefr_result.asset_details:
     for detail in cefr_result.asset_details:
         data.append({
             "Asset": detail.asset.name,
-            "Gross Value": f"${detail.gross_value:,.0f}",
+            "Gross Value": f"£{detail.gross_value:,.0f}",
             "Tax Rate": f"{detail.tax_rate:.1%}",
             "Liquidity Factor": f"{detail.liquidity_factor:.0%}",
             "Reliability Factor": f"{detail.reliability_factor:.0%}",
-            "Net Value": f"${detail.net_value:,.0f}",
+            "Net Value": f"£{detail.net_value:,.0f}",
             "Total Haircut": f"{detail.total_haircut:.1%}",
         })
 

@@ -28,7 +28,7 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
 
     if assets:
         for i, asset in enumerate(assets):
-            with st.expander(f"{asset.name} - ${asset.value:,.0f}", expanded=False):
+            with st.expander(f"{asset.name} - £{asset.value:,.0f}", expanded=False):
                 col1, col2 = st.columns(2)
 
                 with col1:
@@ -38,7 +38,7 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
                         key=f"asset_name_{i}",
                     )
                     new_value = st.number_input(
-                        "Value ($)",
+                        "Value (£)",
                         value=int(asset.value),
                         min_value=0,
                         step=10000,
@@ -77,9 +77,9 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
 
                 # Cost basis for taxable accounts
                 new_cost_basis = None
-                if new_account_type == AccountType.TAXABLE:
+                if new_account_type in (AccountType.TAXABLE, AccountType.GENERAL):
                     new_cost_basis = st.number_input(
-                        "Cost Basis ($)",
+                        "Cost Basis (£)",
                         value=int(asset.cost_basis or asset.value * 0.5),
                         min_value=0,
                         step=10000,
@@ -119,6 +119,6 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
 
     # Summary
     new_balance_sheet = BalanceSheet(assets=assets)
-    st.metric("Total Assets", f"${new_balance_sheet.total_value:,.0f}")
+    st.metric("Total Assets", f"£{new_balance_sheet.total_value:,.0f}")
 
     return new_balance_sheet

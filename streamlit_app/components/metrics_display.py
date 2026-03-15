@@ -32,13 +32,13 @@ def render_cefr_metrics(result: CEFRResult):
     with col2:
         st.metric(
             label="Net Assets",
-            value=f"${result.net_assets:,.0f}",
+            value=f"£{result.net_assets:,.0f}",
         )
 
     with col3:
         st.metric(
             label="Liability PV",
-            value=f"${result.liability_pv:,.0f}",
+            value=f"£{result.liability_pv:,.0f}",
         )
 
     # Interpretation
@@ -52,14 +52,14 @@ def render_cefr_metrics(result: CEFRResult):
     with col1:
         st.metric(
             label="Gross Assets",
-            value=f"${result.gross_assets:,.0f}",
+            value=f"£{result.gross_assets:,.0f}",
         )
 
     with col2:
         pct = result.total_tax_haircut / result.gross_assets * 100 if result.gross_assets > 0 else 0
         st.metric(
             label="Tax Haircut",
-            value=f"${result.total_tax_haircut:,.0f}",
+            value=f"£{result.total_tax_haircut:,.0f}",
             delta=f"-{pct:.1f}%",
             delta_color="inverse",
         )
@@ -68,7 +68,7 @@ def render_cefr_metrics(result: CEFRResult):
         pct = result.total_liquidity_haircut / result.gross_assets * 100 if result.gross_assets > 0 else 0
         st.metric(
             label="Liquidity Haircut",
-            value=f"${result.total_liquidity_haircut:,.0f}",
+            value=f"£{result.total_liquidity_haircut:,.0f}",
             delta=f"-{pct:.1f}%",
             delta_color="inverse",
         )
@@ -77,7 +77,7 @@ def render_cefr_metrics(result: CEFRResult):
         pct = result.total_reliability_haircut / result.gross_assets * 100 if result.gross_assets > 0 else 0
         st.metric(
             label="Reliability Haircut",
-            value=f"${result.total_reliability_haircut:,.0f}",
+            value=f"£{result.total_reliability_haircut:,.0f}",
             delta=f"-{pct:.1f}%",
             delta_color="inverse",
         )
@@ -103,7 +103,7 @@ def render_simulation_metrics(result: SimulationResult):
     with col2:
         st.metric(
             label="Median Terminal Wealth",
-            value=f"${result.median_terminal_wealth:,.0f}",
+            value=f"£{result.median_terminal_wealth:,.0f}",
         )
 
     with col3:
@@ -128,7 +128,7 @@ def render_funding_gap(result: CEFRResult):
     gap = result.funding_gap
 
     if gap > 0:
-        st.warning(f"**Funding Gap:** ${gap:,.0f}")
+        st.warning(f"**Funding Gap:** £{gap:,.0f}")
         st.write("Options to close the gap:")
         st.write("- Increase savings / delay retirement")
         st.write("- Reduce spending targets")
@@ -136,7 +136,7 @@ def render_funding_gap(result: CEFRResult):
         st.write("- Consider part-time work in early retirement")
     else:
         surplus = -gap
-        st.success(f"**Funding Surplus:** ${surplus:,.0f}")
+        st.success(f"**Funding Surplus:** £{surplus:,.0f}")
         st.write("You have flexibility to:")
         st.write("- Increase discretionary spending")
         st.write("- Retire earlier")
