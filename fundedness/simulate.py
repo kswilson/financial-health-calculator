@@ -145,18 +145,22 @@ def run_simulation(
     annual_spending: float | np.ndarray,
     config: SimulationConfig,
     stock_weight: float | np.ndarray = 0.6,
-    spending_floor: float | None = None,
-    inflation_rate: float = 0.025,
+    spending_floor: float | np.ndarray | None = None,
+    inflation_rate: float = 0.0,
 ) -> SimulationResult:
     """Run Monte Carlo simulation of retirement portfolio.
 
+    All values are in real (today's pounds) terms. Returns from both
+    bootstrap and parametric models are real (inflation-adjusted),
+    so spending and wealth stay in constant purchasing power.
+
     Args:
         initial_wealth: Starting portfolio value
-        annual_spending: Annual spending (constant or array by year)
+        annual_spending: Annual spending in real terms (constant or array by year)
         config: Simulation configuration
         stock_weight: Allocation to stocks (constant or array by year)
-        spending_floor: Minimum acceptable spending (for floor breach tracking)
-        inflation_rate: Annual inflation rate for real spending
+        spending_floor: Minimum acceptable spending in real terms (constant or array by year)
+        inflation_rate: Nominal inflation adjustment (default 0 — real terms)
 
     Returns:
         SimulationResult with all paths and metrics
@@ -191,15 +195,25 @@ def run_simulation(
             )
 
     # Generate returns for each year's allocation
-    # For simplicity, use average allocation for return generation
     avg_stock_weight = np.mean(stock_weights)
-    returns = generate_returns(
-        n_simulations=n_sim,
-        n_years=n_years,
-        market_model=config.market_model,
-        stock_weight=avg_stock_weight,
-        random_seed=seed,
-    )
+
+    if config.return_model == "bootstrap":
+        from fundedness.data.registry import get_bootstrap_portfolio_returns
+        returns = get_bootstrap_portfolio_returns(
+            source=config.market_source,
+            n_simulations=n_sim,
+            n_years=n_years,
+            stock_weight=avg_stock_weight,
+            random_seed=seed,
+        )
+    else:
+        returns = generate_returns(
+            n_simulations=n_sim,
+            n_years=n_years,
+            market_model=config.market_model,
+            stock_weight=avg_stock_weight,
+            random_seed=seed,
+        )
 
     # Initialize paths
     wealth_paths = np.zeros((n_sim, n_years + 1))
@@ -208,7 +222,23 @@ def run_simulation(
     spending_paths = np.zeros((n_sim, n_years)) if config.track_spending else None
 
     time_to_ruin = np.full(n_sim, np.inf)
-    time_to_floor_breach = np.full(n_sim, np.inf) if spending_floor else None
+    _is_array_floor = isinstance(spending_floor, np.ndarray)
+    if not _is_array_floor and spending_floor is None:
+        has_floor = False
+    elif _is_array_floor:
+        has_floor = bool(np.any(spending_floor > 0))
+    else:
+        has_floor = float(spending_floor) > 0
+    time_to_floor_breach = np.full(n_sim, np.inf) if has_floor else None
+
+    # Handle spending floor as array
+    if has_floor:
+        if isinstance(spending_floor, (int, float)):
+            floor_schedule = np.full(n_years, spending_floor)
+        else:
+            floor_schedule = np.array(spending_floor)[:n_years]
+            if len(floor_schedule) < n_years:
+                floor_schedule = np.pad(floor_schedule, (0, n_years - len(floor_schedule)), mode="edge")
 
     # Simulate year by year
     for year in range(n_years):
@@ -216,20 +246,25 @@ def run_simulation(
         current_wealth = wealth_paths[:, year]
 
         # Spending (adjusted for inflation)
+        # Negative values = contributions (pre-retirement savings)
         real_spending = spending_schedule[year]
         nominal_spending = real_spending * (1 + inflation_rate) ** year
 
-        # Actual spending (can't spend more than we have)
-        actual_spending = np.minimum(nominal_spending, np.maximum(current_wealth, 0))
+        # Actual spending (can't spend more than we have, but contributions always apply)
+        if nominal_spending >= 0:
+            actual_spending = np.minimum(nominal_spending, np.maximum(current_wealth, 0))
+        else:
+            actual_spending = np.full(n_sim, nominal_spending)  # Contribution (negative)
 
         if spending_paths is not None:
             spending_paths[:, year] = actual_spending
 
-        # Track floor breach
-        if time_to_floor_breach is not None and spending_floor:
-            floor_breach_mask = (actual_spending < spending_floor * (1 + inflation_rate) ** year)
-            floor_breach_mask &= np.isinf(time_to_floor_breach)
-            time_to_floor_breach[floor_breach_mask] = year
+        # Track floor breach (only in withdrawal years, not contribution years)
+        if time_to_floor_breach is not None and nominal_spending > 0:
+            year_floor = floor_schedule[year] * (1 + inflation_rate) ** year
+            if year_floor > 0:
+                floor_breach_mask = (actual_spending < year_floor) & np.isinf(time_to_floor_breach)
+                time_to_floor_breach[floor_breach_mask] = year
 
         # Wealth after spending
         wealth_after_spending = current_wealth - actual_spending
@@ -312,7 +347,12 @@ def run_simulation_with_policy(
     time_to_floor_breach = np.full(n_sim, np.inf) if spending_floor else None
 
     # Generate all random draws upfront
-    z = rng.standard_normal((n_sim, n_years))
+    use_bootstrap = config.return_model == "bootstrap"
+    if use_bootstrap:
+        from fundedness.data.registry import get_bootstrap_returns
+        bootstrap_equity, bootstrap_gilts = get_bootstrap_returns(config.market_source, n_sim, n_years, seed)
+    else:
+        z = rng.standard_normal((n_sim, n_years))
 
     # Simulate year by year
     for year in range(n_years):
@@ -338,29 +378,34 @@ def run_simulation_with_policy(
             initial_wealth=initial_wealth,
         )
 
-        # Calculate returns for this allocation
-        # Handle both scalar and array allocations
-        if isinstance(stock_weight, np.ndarray):
-            # Array allocation: compute returns inline for each path
-            bond_weight = 1 - stock_weight
-            portfolio_return = (
-                stock_weight * config.market_model.stock_return
-                + bond_weight * config.market_model.bond_return
-            )
-            portfolio_vol = np.sqrt(
-                stock_weight**2 * config.market_model.stock_volatility**2
-                + bond_weight**2 * config.market_model.bond_volatility**2
-                + 2 * stock_weight * bond_weight
-                * config.market_model.stock_volatility
-                * config.market_model.bond_volatility
-                * config.market_model.stock_bond_correlation
-            )
+        if use_bootstrap:
+            # Blend historical equity/gilt returns at this year's allocation
+            bond_weight = 1 - stock_weight if isinstance(stock_weight, np.ndarray) else 1 - stock_weight
+            returns = stock_weight * bootstrap_equity[:, year] + bond_weight * bootstrap_gilts[:, year]
         else:
-            # Scalar allocation: use market model methods
-            portfolio_return = config.market_model.expected_portfolio_return(stock_weight)
-            portfolio_vol = config.market_model.portfolio_volatility(stock_weight)
+            # Calculate returns for this allocation
+            # Handle both scalar and array allocations
+            if isinstance(stock_weight, np.ndarray):
+                # Array allocation: compute returns inline for each path
+                bond_weight = 1 - stock_weight
+                portfolio_return = (
+                    stock_weight * config.market_model.stock_return
+                    + bond_weight * config.market_model.bond_return
+                )
+                portfolio_vol = np.sqrt(
+                    stock_weight**2 * config.market_model.stock_volatility**2
+                    + bond_weight**2 * config.market_model.bond_volatility**2
+                    + 2 * stock_weight * bond_weight
+                    * config.market_model.stock_volatility
+                    * config.market_model.bond_volatility
+                    * config.market_model.stock_bond_correlation
+                )
+            else:
+                # Scalar allocation: use market model methods
+                portfolio_return = config.market_model.expected_portfolio_return(stock_weight)
+                portfolio_vol = config.market_model.portfolio_volatility(stock_weight)
 
-        returns = portfolio_return - portfolio_vol**2 / 2 + portfolio_vol * z[:, year]
+            returns = portfolio_return - portfolio_vol**2 / 2 + portfolio_vol * z[:, year]
 
         # Update wealth
         wealth_after_spending = np.maximum(current_wealth - spending, 0)
@@ -475,7 +520,12 @@ def run_simulation_with_utility(
         survival_probabilities = np.ones(n_years)
 
     # Generate all random draws upfront
-    z = rng.standard_normal((n_sim, n_years))
+    use_bootstrap = config.return_model == "bootstrap"
+    if use_bootstrap:
+        from fundedness.data.registry import get_bootstrap_returns
+        bootstrap_equity, bootstrap_gilts = get_bootstrap_returns(config.market_source, n_sim, n_years, seed)
+    else:
+        z = rng.standard_normal((n_sim, n_years))
 
     # Simulate year by year
     for year in range(n_years):
@@ -505,29 +555,33 @@ def run_simulation_with_utility(
             initial_wealth=initial_wealth,
         )
 
-        # Calculate returns for this allocation
-        # Handle both scalar and array allocations
-        if isinstance(stock_weight, np.ndarray):
-            # Array allocation: compute returns inline for each path
-            bond_weight = 1 - stock_weight
-            portfolio_return = (
-                stock_weight * config.market_model.stock_return
-                + bond_weight * config.market_model.bond_return
-            )
-            portfolio_vol = np.sqrt(
-                stock_weight**2 * config.market_model.stock_volatility**2
-                + bond_weight**2 * config.market_model.bond_volatility**2
-                + 2 * stock_weight * bond_weight
-                * config.market_model.stock_volatility
-                * config.market_model.bond_volatility
-                * config.market_model.stock_bond_correlation
-            )
+        if use_bootstrap:
+            bond_weight = 1 - stock_weight if isinstance(stock_weight, np.ndarray) else 1 - stock_weight
+            returns = stock_weight * bootstrap_equity[:, year] + bond_weight * bootstrap_gilts[:, year]
         else:
-            # Scalar allocation: use market model methods
-            portfolio_return = config.market_model.expected_portfolio_return(stock_weight)
-            portfolio_vol = config.market_model.portfolio_volatility(stock_weight)
+            # Calculate returns for this allocation
+            # Handle both scalar and array allocations
+            if isinstance(stock_weight, np.ndarray):
+                # Array allocation: compute returns inline for each path
+                bond_weight = 1 - stock_weight
+                portfolio_return = (
+                    stock_weight * config.market_model.stock_return
+                    + bond_weight * config.market_model.bond_return
+                )
+                portfolio_vol = np.sqrt(
+                    stock_weight**2 * config.market_model.stock_volatility**2
+                    + bond_weight**2 * config.market_model.bond_volatility**2
+                    + 2 * stock_weight * bond_weight
+                    * config.market_model.stock_volatility
+                    * config.market_model.bond_volatility
+                    * config.market_model.stock_bond_correlation
+                )
+            else:
+                # Scalar allocation: use market model methods
+                portfolio_return = config.market_model.expected_portfolio_return(stock_weight)
+                portfolio_vol = config.market_model.portfolio_volatility(stock_weight)
 
-        returns = portfolio_return - portfolio_vol**2 / 2 + portfolio_vol * z[:, year]
+            returns = portfolio_return - portfolio_vol**2 / 2 + portfolio_vol * z[:, year]
 
         # Update wealth
         wealth_after_spending = np.maximum(current_wealth - spending, 0)

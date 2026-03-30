@@ -76,9 +76,8 @@ class TestCEFREndpoint:
                 {"name": "Spending", "annual_amount": 10000},
             ],
             "tax_model": {
-                "federal_ordinary_rate": 0.30,
-                "federal_ltcg_rate": 0.20,
-                "state_ordinary_rate": 0.10,
+                "income_tax_rate": 0.40,
+                "cgt_rate": 0.20,
             },
         }
 

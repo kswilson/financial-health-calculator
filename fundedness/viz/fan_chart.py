@@ -11,6 +11,7 @@ def create_fan_chart(
     percentiles: dict[str, np.ndarray],
     title: str = "Wealth Projection",
     y_label: str = "Portfolio Value ($)",
+    x_label: str = "Year",
     show_median_line: bool = True,
     show_floor: float | None = None,
     height: int = 500,
@@ -19,11 +20,12 @@ def create_fan_chart(
     """Create a fan chart showing percentile bands over time.
 
     Args:
-        years: Array of year values (x-axis)
+        years: Array of x-axis values (years or ages)
         percentiles: Dictionary mapping percentile names to value arrays
             Expected keys: "P10", "P25", "P50", "P75", "P90"
         title: Chart title
         y_label: Y-axis label
+        x_label: X-axis label (e.g. "Year" or "Age")
         show_median_line: Whether to show a distinct median line
         show_floor: Optional floor value to show as horizontal line
         height: Chart height in pixels
@@ -91,8 +93,8 @@ def create_fan_chart(
                     },
                     hovertemplate=(
                         f"<b>{pct_name}</b><br>"
-                        "Year: %{x}<br>"
-                        "Value: $%{y:,.0f}<br>"
+                        f"{x_label}: " + "%{x}<br>"
+                        "Value: £%{y:,.0f}<br>"
                         "<extra></extra>"
                     ),
                     showlegend=not (pct_name in ["P90", "P75", "P25", "P10"]),
@@ -106,7 +108,7 @@ def create_fan_chart(
             line_dash="dash",
             line_color=COLORS["danger_primary"],
             line_width=2,
-            annotation_text=f"Floor: ${show_floor:,.0f}",
+            annotation_text=f"Floor: £{show_floor:,.0f}",
             annotation_position="top right",
             annotation_font_color=COLORS["danger_primary"],
         )
@@ -117,13 +119,13 @@ def create_fan_chart(
         "title": {"text": title},
         "height": height,
         "xaxis": {
-            "title": "Year",
+            "title": x_label,
             "gridcolor": COLORS["neutral_light"],
             "dtick": 5,
         },
         "yaxis": {
             "title": y_label,
-            "tickformat": "$,.0f",
+            "tickformat": "£,.0f",
             "gridcolor": COLORS["neutral_light"],
             "rangemode": "tozero",
         },
@@ -151,17 +153,19 @@ def create_spending_fan_chart(
     floor_spending: float | None = None,
     target_spending: float | None = None,
     title: str = "Spending Projection",
+    x_label: str = "Year",
     height: int = 500,
     width: int | None = None,
 ) -> go.Figure:
     """Create a fan chart specifically for spending projections.
 
     Args:
-        years: Array of year values
+        years: Array of x-axis values (years or ages)
         percentiles: Dictionary mapping percentile names to spending arrays
         floor_spending: Essential spending floor
         target_spending: Target spending level
         title: Chart title
+        x_label: X-axis label (e.g. "Year" or "Age")
         height: Chart height in pixels
         width: Chart width in pixels
 
@@ -172,7 +176,8 @@ def create_spending_fan_chart(
         years=years,
         percentiles=percentiles,
         title=title,
-        y_label="Annual Spending ($)",
+        y_label="Annual Spending (£)",
+        x_label=x_label,
         show_floor=floor_spending,
         height=height,
         width=width,
@@ -185,9 +190,110 @@ def create_spending_fan_chart(
             line_dash="dot",
             line_color=COLORS["success_primary"],
             line_width=2,
-            annotation_text=f"Target: ${target_spending:,.0f}",
+            annotation_text=f"Target: £{target_spending:,.0f}",
             annotation_position="top left",
             annotation_font_color=COLORS["success_primary"],
         )
+
+    return fig
+
+
+def create_funding_sources_chart(
+    years: np.ndarray,
+    sources: dict[str, np.ndarray],
+    title: str = "Spending Funded By",
+    x_label: str = "Age",
+    height: int = 500,
+    width: int | None = None,
+) -> go.Figure:
+    """Create a stacked area chart showing funding source breakdown over time.
+
+    Args:
+        years: Array of x-axis values (ages)
+        sources: Ordered dict mapping source name to annual £ array.
+                 Sources are stacked bottom-to-top in iteration order.
+        title: Chart title
+        x_label: X-axis label
+        height: Chart height in pixels
+        width: Chart width in pixels
+
+    Returns:
+        Plotly Figure object
+    """
+    # Distinct colors per source type
+    source_colors = {
+        "Salary": "#f39c12",
+        "Portfolio": "#3498db",
+    }
+    pension_greens = ["#27ae60", "#2ecc71", "#58d68d", "#82e0aa"]
+    severance_color = "#9b59b6"
+
+    fig = go.Figure()
+
+    green_idx = 0
+    for name, values in sources.items():
+        if name in source_colors:
+            color = source_colors[name]
+        elif "Severance" in name:
+            color = severance_color
+        else:
+            color = pension_greens[green_idx % len(pension_greens)]
+            green_idx += 1
+
+        # Compute percentage for hover
+        totals = sum(sources.values())
+        pcts = np.where(totals > 0, values / totals * 100, 0)
+
+        fig.add_trace(
+            go.Scatter(
+                x=years,
+                y=values,
+                mode="lines",
+                name=name,
+                stackgroup="funding",
+                fillcolor=color.replace(")", ", 0.7)").replace("#", "rgba(")
+                if color.startswith("rgba")
+                else f"rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.7)",
+                line={"width": 0.5, "color": color},
+                hovertemplate=(
+                    f"<b>{name}</b><br>"
+                    f"{x_label}: " + "%{x}<br>"
+                    "Amount: £%{y:,.0f}<br>"
+                    f"Share: %{{customdata:.0f}}%<br>"
+                    "<extra></extra>"
+                ),
+                customdata=pcts,
+            )
+        )
+
+    layout = get_plotly_layout_defaults()
+    layout.update({
+        "title": {"text": title},
+        "height": height,
+        "xaxis": {
+            "title": x_label,
+            "gridcolor": COLORS["neutral_light"],
+            "dtick": 5,
+        },
+        "yaxis": {
+            "title": "Annual Amount (£)",
+            "tickformat": "£,.0f",
+            "gridcolor": COLORS["neutral_light"],
+            "rangemode": "tozero",
+        },
+        "legend": {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
+        "hovermode": "x unified",
+    })
+
+    if width:
+        layout["width"] = width
+
+    fig.update_layout(**layout)
 
     return fig

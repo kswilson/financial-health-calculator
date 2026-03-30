@@ -213,6 +213,8 @@ with tab2:
         n_years=remaining_years,
         market_model=market_model,
         random_seed=42,
+        return_model=st.session_state.get("return_model", "lognormal"),
+        market_source=st.session_state.get("market_source", "uk"),
     )
 
     # Policies to compare

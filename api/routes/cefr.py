@@ -45,9 +45,8 @@ class LiabilityInput(BaseModel):
 class TaxModelInput(BaseModel):
     """Input schema for tax assumptions."""
 
-    federal_ordinary_rate: float = Field(default=0.24, ge=0, le=1)
-    federal_ltcg_rate: float = Field(default=0.15, ge=0, le=1)
-    state_ordinary_rate: float = Field(default=0.093, ge=0, le=1)
+    income_tax_rate: float = Field(default=0.40, ge=0, le=1)
+    cgt_rate: float = Field(default=0.20, ge=0, le=1)
 
 
 class CEFRRequest(BaseModel):
@@ -151,9 +150,8 @@ async def compute_cefr_endpoint(request: CEFRRequest) -> CEFRResponse:
         tax_model = TaxModel()
         if request.tax_model:
             tax_model = TaxModel(
-                federal_ordinary_rate=request.tax_model.federal_ordinary_rate,
-                federal_ltcg_rate=request.tax_model.federal_ltcg_rate,
-                state_ordinary_rate=request.tax_model.state_ordinary_rate,
+                income_tax_rate=request.tax_model.income_tax_rate,
+                cgt_rate=request.tax_model.cgt_rate,
             )
 
         # Compute CEFR

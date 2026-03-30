@@ -114,6 +114,8 @@ config = SimulationConfig(
     n_years=household.planning_horizon,
     market_model=market_model,
     random_seed=42,
+    return_model=st.session_state.get("return_model", "lognormal"),
+    market_source=st.session_state.get("market_source", "uk"),
 )
 
 with st.spinner(f"Comparing {len(policies)} strategies across {n_simulations:,} simulations..."):

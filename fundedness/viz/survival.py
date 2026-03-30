@@ -12,17 +12,19 @@ def create_survival_curve(
     floor_survival_prob: np.ndarray | None = None,
     title: str = "Portfolio Survival Probability",
     threshold_years: list[int] | None = None,
+    x_label: str = "Years",
     height: int = 450,
     width: int | None = None,
 ) -> go.Figure:
     """Create a survival curve showing probability of not running out of money.
 
     Args:
-        years: Array of year values
+        years: Array of x-axis values (years or ages)
         survival_prob: Probability of portfolio survival at each year (above ruin)
         floor_survival_prob: Probability of being above spending floor at each year
         title: Chart title
-        threshold_years: Years to highlight with vertical lines (e.g., [20, 30])
+        threshold_years: X-axis values to highlight with vertical lines
+        x_label: X-axis label (e.g. "Years" or "Age")
         height: Chart height in pixels
         width: Chart width in pixels
 
@@ -45,7 +47,7 @@ def create_survival_curve(
             fill="tozeroy",
             fillcolor="rgba(52, 152, 219, 0.2)",
             hovertemplate=(
-                "<b>Year %{x}</b><br>"
+                f"<b>{x_label} " + "%{x}</b><br>"
                 "Survival Probability: %{y:.1f}%<br>"
                 "<extra></extra>"
             ),
@@ -66,7 +68,7 @@ def create_survival_curve(
                     "dash": "dash",
                 },
                 hovertemplate=(
-                    "<b>Year %{x}</b><br>"
+                    f"<b>{x_label} " + "%{x}</b><br>"
                     "Floor Probability: %{y:.1f}%<br>"
                     "<extra></extra>"
                 ),
@@ -84,7 +86,7 @@ def create_survival_curve(
                         x=year,
                         line_dash="dot",
                         line_color=COLORS["neutral_primary"],
-                        annotation_text=f"Year {year}: {prob:.0f}%",
+                        annotation_text=f"{x_label} {year}: {prob:.0f}%",
                         annotation_position="top",
                     )
 
@@ -103,7 +105,7 @@ def create_survival_curve(
         "title": {"text": title},
         "height": height,
         "xaxis": {
-            "title": "Years",
+            "title": x_label,
             "gridcolor": COLORS["neutral_light"],
             "dtick": 5,
         },
@@ -135,6 +137,7 @@ def create_dual_survival_chart(
     ruin_prob: np.ndarray,
     floor_breach_prob: np.ndarray,
     title: str = "Risk Timeline",
+    x_label: str = "Years",
     height: int = 450,
     width: int | None = None,
 ) -> go.Figure:
@@ -169,7 +172,7 @@ def create_dual_survival_chart(
             fill="tozeroy",
             fillcolor="rgba(243, 156, 18, 0.15)",
             hovertemplate=(
-                "<b>Year %{x}</b><br>"
+                f"<b>{x_label} " + "%{x}</b><br>"
                 "Floor Breach Risk: %{y:.1f}%<br>"
                 "<extra></extra>"
             ),
@@ -190,7 +193,7 @@ def create_dual_survival_chart(
             fill="tozeroy",
             fillcolor="rgba(231, 76, 60, 0.15)",
             hovertemplate=(
-                "<b>Year %{x}</b><br>"
+                f"<b>{x_label} " + "%{x}</b><br>"
                 "Ruin Risk: %{y:.1f}%<br>"
                 "<extra></extra>"
             ),
@@ -203,7 +206,7 @@ def create_dual_survival_chart(
         "title": {"text": title},
         "height": height,
         "xaxis": {
-            "title": "Years",
+            "title": x_label,
             "gridcolor": COLORS["neutral_light"],
             "dtick": 5,
         },

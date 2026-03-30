@@ -26,7 +26,7 @@ class GuardrailsPolicy(BaseWithdrawalPolicy):
     lower_guardrail: float = 0.04  # Raise spending if rate falls below this
     cut_amount: float = 0.10  # Cut spending by 10% when hitting upper rail
     raise_amount: float = 0.10  # Raise spending by 10% when hitting lower rail
-    inflation_rate: float = 0.025
+    inflation_rate: float = 0.0  # 0% — returns are real, spending stays in real terms
     no_raise_in_down_year: bool = True  # Don't raise spending after negative returns
 
     _initial_spending: float = field(default=0.0, init=False, repr=False)

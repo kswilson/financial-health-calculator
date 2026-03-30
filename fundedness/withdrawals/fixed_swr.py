@@ -20,7 +20,7 @@ class FixedRealSWRPolicy(BaseWithdrawalPolicy):
     """
 
     withdrawal_rate: float = 0.04  # 4% default
-    inflation_rate: float = 0.025  # 2.5% expected inflation
+    inflation_rate: float = 0.0  # 0% — returns are real, spending stays in real terms
 
     @property
     def name(self) -> str:

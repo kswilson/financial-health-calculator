@@ -49,6 +49,10 @@ class SimulationConfig(BaseModel):
         default="lognormal",
         description="Model for generating returns",
     )
+    market_source: Literal["uk", "us", "world", "50/50"] = Field(
+        default="uk",
+        description="Historical market dataset for bootstrap returns",
+    )
 
     # Output options
     percentiles: list[int] = Field(

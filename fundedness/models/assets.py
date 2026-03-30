@@ -55,7 +55,11 @@ class Asset(BaseModel):
     """A single asset holding."""
 
     name: str = Field(..., description="Descriptive name for the asset")
-    value: float = Field(..., ge=0, description="Current market value in dollars")
+    owner: Optional[str] = Field(
+        default=None,
+        description="Owner's name (for multi-person households, None = primary)",
+    )
+    value: float = Field(..., ge=0, description="Current market value")
     account_type: AccountType = Field(
         default=AccountType.TAXABLE,
         description="Tax treatment of the account",
@@ -76,6 +80,17 @@ class Asset(BaseModel):
         default=None,
         ge=0,
         description="Cost basis for tax calculations (taxable accounts only)",
+    )
+    annual_contribution: float = Field(
+        default=0,
+        ge=0,
+        description="Annual pre-retirement contribution to this account (today's pounds)",
+    )
+    contribution_growth_rate: float = Field(
+        default=0.0,
+        ge=-0.05,
+        le=0.10,
+        description="Real annual growth rate of contributions (e.g. salary increases above inflation)",
     )
     expected_return: Optional[float] = Field(
         default=None,

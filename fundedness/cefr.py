@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from fundedness.liabilities import calculate_total_liability_pv
+from fundedness.liabilities import calculate_annuity_pv, calculate_total_liability_pv
 from fundedness.liquidity import get_liquidity_factor
-from fundedness.models.assets import Asset, BalanceSheet
+from fundedness.models.assets import AccountType, Asset, BalanceSheet
 from fundedness.models.household import Household
 from fundedness.models.liabilities import Liability
 from fundedness.models.tax import TaxModel
@@ -63,6 +63,8 @@ class CEFRResult:
 
     # Denominator
     liability_pv: float
+    pension_income_pv: float = 0.0  # PV of pension income that offsets liabilities
+    net_liability_pv: float = 0.0  # liability_pv - pension_income_pv
 
     # Detailed breakdowns
     asset_details: list[AssetHaircutDetail] = field(default_factory=list)
@@ -87,7 +89,7 @@ class CEFRResult:
     @property
     def funding_gap(self) -> float:
         """Dollar gap if underfunded (positive = gap, negative = surplus)."""
-        return self.liability_pv - self.net_assets
+        return self.net_liability_pv - self.net_assets
 
     def get_interpretation(self) -> str:
         """Get a human-readable interpretation of the CEFR."""
@@ -128,6 +130,7 @@ def compute_asset_haircuts(
     tax_rate = tax_model.get_effective_tax_rate(
         account_type=asset.account_type,
         cost_basis_ratio=cost_basis_ratio,
+        amount=gross_value,
     )
     after_tax_value = gross_value * (1 - tax_rate)
 
@@ -154,11 +157,71 @@ def compute_asset_haircuts(
     )
 
 
+def calculate_pension_income_pv(
+    household: Household,
+    planning_horizon: int,
+    real_discount_rate: float = 0.02,
+    base_inflation: float = 0.025,
+) -> float:
+    """Calculate the present value of future pension income streams.
+
+    Includes state pension and defined-benefit pension for all members.
+
+    Args:
+        household: Household with members
+        planning_horizon: Years to project
+        real_discount_rate: Real discount rate
+        base_inflation: Base inflation assumption
+
+    Returns:
+        Total PV of pension income
+    """
+    total_pv = 0.0
+    primary_age = household.primary_member.age if household.primary_member else 65
+
+    for member in household.members:
+        # State pension: inflation-linked (constant in real terms)
+        sp_age = getattr(member, "social_security_age", None) or 67
+        sp_annual = member.social_security_annual
+        if sp_annual > 0:
+            years_until_sp = max(0, sp_age - member.age)
+            years_receiving_sp = max(0, planning_horizon - years_until_sp)
+            if years_receiving_sp > 0:
+                total_pv += calculate_annuity_pv(
+                    annual_payment=sp_annual,
+                    n_years=years_receiving_sp,
+                    discount_rate=real_discount_rate,
+                    growth_rate=0.0,  # CPI-linked = constant in real terms
+                    start_year=years_until_sp,
+                )
+
+        # DB pension
+        db_annual = member.pension_annual
+        db_start_age = getattr(member, "pension_start_age", None) or 60
+        db_linked = getattr(member, "pension_inflation_linked", False)
+        if db_annual > 0:
+            years_until_db = max(0, db_start_age - member.age)
+            years_receiving_db = max(0, planning_horizon - years_until_db)
+            if years_receiving_db > 0:
+                # If not inflation-linked, real value erodes
+                growth_rate = 0.0 if db_linked else -base_inflation
+                total_pv += calculate_annuity_pv(
+                    annual_payment=db_annual,
+                    n_years=years_receiving_db,
+                    discount_rate=real_discount_rate,
+                    growth_rate=growth_rate,
+                    start_year=years_until_db,
+                )
+
+    return total_pv
+
+
 def compute_cefr(
     household: Household | None = None,
     balance_sheet: BalanceSheet | None = None,
     liabilities: list[Liability] | None = None,
     tax_model: TaxModel | None = None,
+    tax_models: dict[str, TaxModel] | None = None,
     planning_horizon: int | None = None,
     real_discount_rate: float = 0.02,
     base_inflation: float = 0.025,
@@ -176,7 +239,8 @@ def compute_cefr(
         household: Complete household model (alternative to separate components)
         balance_sheet: Asset holdings (if household not provided)
         liabilities: Future spending obligations (if household not provided)
-        tax_model: Tax rate assumptions (defaults to TaxModel())
+        tax_model: Tax rate assumptions for single-person (defaults to TaxModel())
+        tax_models: Per-person tax models keyed by person name (for couples)
         planning_horizon: Years to plan for (defaults to household horizon or 30)
         real_discount_rate: Real discount rate for liability PV
         base_inflation: Base inflation assumption
@@ -202,11 +266,73 @@ def compute_cefr(
     if tax_model is None:
         tax_model = TaxModel()
 
-    # Compute asset haircuts
-    asset_details = [
-        compute_asset_haircuts(asset, tax_model)
-        for asset in balance_sheet.assets
-    ]
+    # Determine primary owner name for assets with owner=None
+    primary_name = None
+    if household and household.primary_member:
+        primary_name = household.primary_member.name
+
+    # Build per-person tax models if not provided but household has multiple members
+    if tax_models is None and household and len(household.members) > 1:
+        from fundedness.models.tax import build_tax_models_for_household
+        tax_models = build_tax_models_for_household(household, tax_model)
+
+    # Compute asset haircuts with cumulative income stacking per owner.
+    # Income-taxed assets (SIPP, TAX_DEFERRED) are grouped by owner so each
+    # person's withdrawals stack within their own tax bands independently.
+    income_taxed = {AccountType.TAX_DEFERRED, AccountType.SIPP}
+
+    def _get_owner(asset: Asset) -> str:
+        return asset.owner or primary_name or "_default"
+
+    if tax_models:
+        # Multi-person: group by owner, stack independently per person
+        from collections import defaultdict
+        income_by_owner: dict[str, list[Asset]] = defaultdict(list)
+        other_by_owner: dict[str, list[Asset]] = defaultdict(list)
+
+        for asset in balance_sheet.assets:
+            owner = _get_owner(asset)
+            if asset.account_type in income_taxed:
+                income_by_owner[owner].append(asset)
+            else:
+                other_by_owner[owner].append(asset)
+
+        asset_details = []
+
+        # Process income-taxed assets per owner with cumulative stacking
+        for owner, assets in income_by_owner.items():
+            owner_tm = tax_models.get(owner, tax_model).model_copy()
+            for asset in assets:
+                detail = compute_asset_haircuts(asset, owner_tm)
+                asset_details.append(detail)
+                owner_tm = owner_tm.model_copy(
+                    update={"other_income": owner_tm.other_income + asset.value}
+                )
+
+        # Process non-income-taxed assets per owner (independent CGT allowances)
+        for owner, assets in other_by_owner.items():
+            owner_tm = tax_models.get(owner, tax_model)
+            for asset in assets:
+                detail = compute_asset_haircuts(asset, owner_tm)
+                asset_details.append(detail)
+    else:
+        # Single-person: original cumulative logic
+        income_assets = [a for a in balance_sheet.assets if a.account_type in income_taxed]
+        other_assets = [a for a in balance_sheet.assets if a.account_type not in income_taxed]
+
+        asset_details = []
+        cumulative_tax_model = tax_model.model_copy()
+
+        for asset in income_assets:
+            detail = compute_asset_haircuts(asset, cumulative_tax_model)
+            asset_details.append(detail)
+            cumulative_tax_model = cumulative_tax_model.model_copy(
+                update={"other_income": cumulative_tax_model.other_income + asset.value}
+            )
+
+        for asset in other_assets:
+            detail = compute_asset_haircuts(asset, tax_model)
+            asset_details.append(detail)
 
     # Aggregate numerator
     gross_assets = sum(d.gross_value for d in asset_details)
@@ -223,11 +349,22 @@ def compute_cefr(
         base_inflation=base_inflation,
     )
 
-    # Calculate CEFR
-    if liability_pv == 0:
+    # Offset pension income against liabilities
+    pension_income_pv = 0.0
+    if household is not None:
+        pension_income_pv = calculate_pension_income_pv(
+            household=household,
+            planning_horizon=planning_horizon,
+            real_discount_rate=real_discount_rate,
+            base_inflation=base_inflation,
+        )
+    net_liability_pv = max(0, liability_pv - pension_income_pv)
+
+    # Calculate CEFR using net liabilities (after pension income offset)
+    if net_liability_pv == 0:
         cefr = float("inf") if net_assets > 0 else 0.0
     else:
-        cefr = net_assets / liability_pv
+        cefr = net_assets / net_liability_pv
 
     return CEFRResult(
         cefr=cefr,
@@ -237,5 +374,7 @@ def compute_cefr(
         total_reliability_haircut=total_reliability_haircut,
         net_assets=net_assets,
         liability_pv=liability_pv,
+        pension_income_pv=pension_income_pv,
+        net_liability_pv=net_liability_pv,
         asset_details=asset_details,
     )

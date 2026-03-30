@@ -12,23 +12,47 @@ from fundedness.models.assets import (
 )
 
 
-def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
+def _save_balance_sheet(assets: list[Asset]):
+    """Persist balance sheet to session state before rerun."""
+    from streamlit_app.utils.session_state import update_household
+    household = st.session_state.household
+    household.balance_sheet = BalanceSheet(assets=assets)
+    update_household(household)
+
+
+def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | None = None) -> BalanceSheet:
     """Render an editable table of assets.
 
     Args:
         balance_sheet: Current balance sheet
+        member_names: List of household member names (for owner selector)
 
     Returns:
         Updated balance sheet
     """
     st.subheader("Assets")
 
+    show_owner = member_names and len(member_names) > 1
+
     # Display current assets
     assets = balance_sheet.assets.copy()
 
     if assets:
         for i, asset in enumerate(assets):
-            with st.expander(f"{asset.name} - £{asset.value:,.0f}", expanded=False):
+            owner_label = f" ({asset.owner})" if show_owner and asset.owner else ""
+            with st.expander(f"{asset.name}{owner_label} - £{asset.value:,.0f}", expanded=False):
+                # Owner selector for couples
+                new_owner = asset.owner
+                if show_owner:
+                    owner_options = member_names
+                    current_idx = owner_options.index(asset.owner) if asset.owner in owner_options else 0
+                    new_owner = st.selectbox(
+                        "Owner",
+                        options=owner_options,
+                        index=current_idx,
+                        key=f"asset_owner_{i}",
+                    )
+
                 col1, col2 = st.columns(2)
 
                 with col1:
@@ -89,6 +113,7 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
                 # Update asset
                 assets[i] = Asset(
                     name=new_name,
+                    owner=new_owner,
                     value=float(new_value),
                     account_type=new_account_type,
                     asset_class=new_asset_class,
@@ -100,6 +125,7 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
                 # Delete button
                 if st.button("Delete Asset", key=f"delete_asset_{i}"):
                     assets.pop(i)
+                    _save_balance_sheet(assets)
                     st.rerun()
 
     # Add new asset
@@ -115,6 +141,7 @@ def render_asset_editor(balance_sheet: BalanceSheet) -> BalanceSheet:
                 concentration_level=ConcentrationLevel.DIVERSIFIED,
             )
         )
+        _save_balance_sheet(assets)
         st.rerun()
 
     # Summary

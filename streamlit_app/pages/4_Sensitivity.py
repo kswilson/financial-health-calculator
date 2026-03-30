@@ -139,19 +139,23 @@ parameter_labels.append(param)
 
 from fundedness.models.tax import TaxModel
 
-low_tax = TaxModel(
-    federal_ordinary_rate=tax_model.federal_ordinary_rate * 0.8,
-    federal_ltcg_rate=tax_model.federal_ltcg_rate * 0.8,
-    state_ordinary_rate=tax_model.state_ordinary_rate * 0.8,
-)
+low_tax = tax_model.model_copy(update={
+    "basic_rate": tax_model.basic_rate * 0.8,
+    "higher_rate": tax_model.higher_rate * 0.8,
+    "additional_rate": tax_model.additional_rate * 0.8,
+    "cgt_basic_rate": tax_model.cgt_basic_rate * 0.8,
+    "cgt_higher_rate": tax_model.cgt_higher_rate * 0.8,
+})
 low_result = compute_cefr(household=household, tax_model=low_tax)
 low_values.append(low_result.cefr)
 
-high_tax = TaxModel(
-    federal_ordinary_rate=min(tax_model.federal_ordinary_rate * 1.2, 0.5),
-    federal_ltcg_rate=min(tax_model.federal_ltcg_rate * 1.2, 0.3),
-    state_ordinary_rate=min(tax_model.state_ordinary_rate * 1.2, 0.15),
-)
+high_tax = tax_model.model_copy(update={
+    "basic_rate": min(tax_model.basic_rate * 1.2, 0.25),
+    "higher_rate": min(tax_model.higher_rate * 1.2, 0.50),
+    "additional_rate": min(tax_model.additional_rate * 1.2, 0.50),
+    "cgt_basic_rate": min(tax_model.cgt_basic_rate * 1.2, 0.18),
+    "cgt_higher_rate": min(tax_model.cgt_higher_rate * 1.2, 0.28),
+})
 high_result = compute_cefr(household=household, tax_model=high_tax)
 high_values.append(high_result.cefr)
 

@@ -10,7 +10,7 @@ class FixedRealSpending:
     """Fixed real (inflation-adjusted) spending policy."""
 
     annual_spending: float
-    inflation_rate: float = 0.025
+    inflation_rate: float = 0.0  # 0% — returns are real, spending stays in real terms
 
     def get_spending(
         self,
@@ -18,7 +18,7 @@ class FixedRealSpending:
         year: int,
         initial_wealth: float,
     ) -> np.ndarray:
-        """Get spending, capped at available wealth."""
+        """Get spending in real terms, capped at available wealth."""
         nominal_spending = self.annual_spending * (1 + self.inflation_rate) ** year
         return np.minimum(nominal_spending, np.maximum(wealth, 0))
 

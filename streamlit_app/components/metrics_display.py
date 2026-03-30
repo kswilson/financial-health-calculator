@@ -19,7 +19,7 @@ def render_cefr_metrics(result: CEFRResult):
     elif result.cefr < 1.0:
         cefr_color = "inverse"  # Red
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
@@ -37,9 +37,23 @@ def render_cefr_metrics(result: CEFRResult):
 
     with col3:
         st.metric(
-            label="Liability PV",
+            label="Spending PV",
             value=f"£{result.liability_pv:,.0f}",
         )
+
+    with col4:
+        if result.pension_income_pv > 0:
+            st.metric(
+                label="Net Liability PV",
+                value=f"£{result.net_liability_pv:,.0f}",
+                delta=f"Pension offset £{result.pension_income_pv:,.0f}",
+                delta_color="off",
+            )
+        else:
+            st.metric(
+                label="Net Liability PV",
+                value=f"£{result.net_liability_pv:,.0f}",
+            )
 
     # Interpretation
     st.info(result.get_interpretation())
@@ -132,7 +146,7 @@ def render_funding_gap(result: CEFRResult):
         st.write("Options to close the gap:")
         st.write("- Increase savings / delay retirement")
         st.write("- Reduce spending targets")
-        st.write("- Delay Social Security claiming")
+        st.write("- Delay State Pension claiming")
         st.write("- Consider part-time work in early retirement")
     else:
         surplus = -gap

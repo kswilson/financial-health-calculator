@@ -12,6 +12,7 @@ def create_time_distribution_histogram(
     planning_horizon: int | None = None,
     percentiles_to_show: list[int] | None = None,
     title: str | None = None,
+    starting_age: int | None = None,
     height: int = 400,
     width: int | None = None,
 ) -> go.Figure:
@@ -23,6 +24,7 @@ def create_time_distribution_histogram(
         planning_horizon: Maximum planning horizon (for x-axis)
         percentiles_to_show: Percentiles to mark (e.g., [10, 50, 90])
         title: Chart title (auto-generated if None)
+        starting_age: If provided, x-axis shows age instead of years
         height: Chart height in pixels
         width: Chart width in pixels
 
@@ -34,26 +36,29 @@ def create_time_distribution_histogram(
     never_occurred_count = np.sum(~np.isfinite(time_to_event))
     total_count = len(time_to_event)
 
+    age_offset = starting_age or 0
+    use_age = starting_age is not None
+    x_unit = "Age" if use_age else "Year"
+
     if title is None:
         title = f"Time to {event_name} Distribution"
 
     fig = go.Figure()
 
     if len(finite_times) > 0:
-        # Determine bins
-        max_time = planning_horizon or int(np.ceil(finite_times.max()))
-        bins = np.arange(0, max_time + 2, 1)
+        display_times = finite_times + age_offset
+        max_time = (planning_horizon or int(np.ceil(finite_times.max()))) + age_offset
 
         # Create histogram
         fig.add_trace(
             go.Histogram(
-                x=finite_times,
-                xbins={"start": 0, "end": max_time + 1, "size": 1},
+                x=display_times,
+                xbins={"start": age_offset, "end": max_time + 1, "size": 1},
                 marker_color=COLORS["danger_primary"],
                 opacity=0.7,
-                name=f"Years to {event_name}",
+                name=f"{x_unit} at {event_name}",
                 hovertemplate=(
-                    "<b>Year %{x}</b><br>"
+                    f"<b>{x_unit} " + "%{x}</b><br>"
                     "Count: %{y}<br>"
                     "<extra></extra>"
                 ),
@@ -71,14 +76,15 @@ def create_time_distribution_histogram(
             }
 
             for pct in percentiles_to_show:
-                value = np.percentile(finite_times, pct)
+                value = np.percentile(display_times, pct)
                 color = percentile_colors.get(pct, COLORS["neutral_primary"])
+                label = f"P{pct}: age {value:.0f}" if use_age else f"P{pct}: {value:.1f}y"
                 fig.add_vline(
                     x=value,
                     line_dash="dash",
                     line_color=color,
                     line_width=2,
-                    annotation_text=f"P{pct}: {value:.1f}y",
+                    annotation_text=label,
                     annotation_position="top",
                     annotation_font_color=color,
                 )
@@ -107,7 +113,7 @@ def create_time_distribution_histogram(
         "title": {"text": title},
         "height": height,
         "xaxis": {
-            "title": f"Years to {event_name}",
+            "title": f"{x_unit} at {event_name}" if use_age else f"Years to {event_name}",
             "gridcolor": COLORS["neutral_light"],
             "dtick": 5,
         },
