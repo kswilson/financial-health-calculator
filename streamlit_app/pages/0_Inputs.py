@@ -536,6 +536,26 @@ with tab4:
         update_market_model(new_market_model)
 
     st.divider()
+    st.subheader("Return Haircut")
+    from streamlit_app.utils.session_state import get_return_haircut, set_return_haircut
+    _haircut_pct = st.number_input(
+        "Subtract from every simulated year's return (%/yr)",
+        min_value=0.0,
+        max_value=5.0,
+        value=round(get_return_haircut() * 100, 2),
+        step=0.25,
+        format="%.2f",
+        help="Applied to both the historical bootstrap and the parametric model.",
+    )
+    set_return_haircut(_haircut_pct / 100)
+    st.caption(
+        "The historical series are index returns with no costs, from a period (1970–2024) when "
+        "equity valuations rose and interest rates fell — conditions that can't simply repeat. "
+        "The haircut is a crude allowance for **fees and platform costs (~0.3–0.6%/yr)** plus "
+        "**lower forward expected returns than history (~1–2%/yr)**. It shifts the centre of the "
+        "return distribution only; it does not add crashes, bad decades or sequence risk. "
+        "1% ≈ honest base case; 2% ≈ mainstream cautious assumptions; 0% ≈ the future is 1970–2024 with free investing."
+    )
 
     st.subheader("Tax Assumptions")
     st.markdown("UK income tax is calculated using progressive bands. "
@@ -593,6 +613,7 @@ with col_save:
         "retirement_year": st.session_state.get("retirement_year", 2033),
         "market_source": st.session_state.get("market_source", "uk"),
         "return_model": st.session_state.get("return_model", "lognormal"),
+        "return_haircut": st.session_state.get("return_haircut", 0.01),
     }
     st.download_button(
         label="💾 Download my full situation as JSON",
@@ -626,6 +647,8 @@ with col_load:
                     st.session_state.market_source = data["market_source"]
                 if "return_model" in data:
                     st.session_state.return_model = data["return_model"]
+                if "return_haircut" in data:
+                    st.session_state.return_haircut = data["return_haircut"]
             else:
                 # Old format: entire JSON is a Household
                 loaded = TypeAdapter(Household).validate_python(data)

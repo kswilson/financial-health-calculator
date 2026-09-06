@@ -13,6 +13,7 @@ from fundedness.viz.tornado import create_scenario_comparison_chart, create_torn
 from streamlit_app.utils.session_state import (
     get_household,
     get_market_model,
+    get_return_haircut,
     get_tax_model,
     initialize_session_state,
 )
@@ -52,6 +53,7 @@ tax_model = get_tax_model()
 retirement_year = st.session_state.get("retirement_year", None)
 return_model = st.session_state.get("return_model", "lognormal")
 market_source = st.session_state.get("market_source", "uk")
+base_shift = -get_return_haircut()
 
 
 def success_rate(
@@ -61,7 +63,7 @@ def success_rate(
     wealth=None,
     n_years=None,
     stocks=stock_allocation / 100,
-    return_shift=0.0,
+    return_shift=base_shift,
 ) -> float:
     plan = build_runway_plan(
         household,
@@ -118,9 +120,9 @@ with st.spinner("Running sensitivity scenarios..."):
 
     factors.append((
         "Returns ±1%/yr",
-        success_rate(return_shift=-0.01),
-        success_rate(return_shift=+0.01),
-        "−1%/yr", "+1%/yr",
+        success_rate(return_shift=base_shift - 0.01),
+        success_rate(return_shift=base_shift + 0.01),
+        f"{-base_shift + 0.01:.0%} haircut", f"{max(0, -base_shift - 0.01):.0%} haircut",
     ))
 
     lo_stock = max(0.0, stock_allocation / 100 - 0.2)
@@ -233,7 +235,8 @@ with st.expander("How to read this"):
       {base_plan.starting_age + base_years}. Base case: **{base:.1%}**.
     - Each tornado bar changes one input and re-runs the full Time Runway model (pensions, savings,
       severance, per-person tax) — so the bars are directly comparable with the Time Runway page.
-    - "Returns ±1%/yr" shifts every simulated year's return, for both the historical bootstrap and
-      the log-normal model. It's the cleanest way to ask "what if the future is worse than the past?"
+    - All scenarios include your return haircut of {-base_shift:.2%}/yr (Inputs → Assumptions).
+      "Returns ±1%/yr" moves that haircut up or down by one point, for both the historical bootstrap
+      and the log-normal model.
     - Bars use {n_simulations:,} simulations each, so differences under ~1 point are noise.
     """)

@@ -16,6 +16,7 @@ from streamlit_app.components.metrics_display import render_simulation_metrics
 from streamlit_app.utils.session_state import (
     get_household,
     get_market_model,
+    get_return_haircut,
     get_tax_model,
     initialize_session_state,
 )
@@ -70,6 +71,7 @@ annual_spending = plan.annual_spending
 spending_floor = plan.spending_floor
 initial_wealth = plan.initial_wealth
 withdrawal_rate = (annual_spending / initial_wealth * 100) if initial_wealth > 0 else 0
+return_haircut = get_return_haircut()
 
 with st.spinner(f"Running {n_simulations:,} simulations..."):
     result = run_runway(
@@ -79,11 +81,18 @@ with st.spinner(f"Running {n_simulations:,} simulations..."):
         stock_allocation=stock_allocation / 100,
         return_model=st.session_state.get("return_model", "lognormal"),
         market_source=st.session_state.get("market_source", "uk"),
+        return_shift=-return_haircut,
     )
     st.session_state.simulation_result = result
 
 # Display metrics
 render_simulation_metrics(result)
+st.caption(
+    f"Returns: {st.session_state.get('market_source', 'uk')} "
+    f"{'historical bootstrap' if st.session_state.get('return_model') == 'bootstrap' else 'parametric'} "
+    f"with a {return_haircut:.2%}/yr haircut (Inputs → Assumptions). "
+    "P10 terminal wealth: 1 in 10 outcomes end below this."
+)
 
 st.divider()
 
@@ -338,6 +347,7 @@ with st.expander("Understanding the Results"):
     - **Ongoing Spending Need**: £{annual_spending:,.0f}/yr ({withdrawal_rate:.1f}% of portfolio)
     - **Essential Spending Floor**: £{spending_floor:,.0f}
     - **Stock Allocation**: {stock_allocation}%
+    - **Return Haircut**: {return_haircut:.2%}/yr
     - {ret_line}
     - **Current Age**: {starting_age}
     - **Planning to Age**: {starting_age + n_years}{horizon_note}

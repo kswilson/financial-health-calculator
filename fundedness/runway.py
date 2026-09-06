@@ -309,7 +309,11 @@ def build_runway_plan(
     # --- Thai severance: one-off inflow in the retirement year ---
     severance = sum(m.thai_severance_gbp(retirement_year) for m in members)
     if severance > 0 and 0 < years_until_retired < n_years:
-        net_spending_by_year[years_until_retired] -= severance
+        idx = years_until_retired
+        net_spending_by_year[idx] -= severance
+        # The inflow covers part of that year's need, so the portfolio floor drops too —
+        # otherwise the (reduced) draw is compared to the full floor and every path "breaches".
+        floor_by_year[idx] = max(0.0, floor_by_year[idx] - severance)
 
     return RunwayPlan(
         n_years=n_years,

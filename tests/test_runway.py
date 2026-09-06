@@ -310,3 +310,19 @@ class TestDatedLiabilities:
         pct = total_spending_percentiles(plan, result)
         assert pct["P50"][3] == 100_000
         assert pct["P50"][0] == 70_000
+
+
+class TestSeveranceFloor:
+    def test_severance_year_floor_is_reduced_by_the_inflow(self):
+        member = Person(name="A", age=54, social_security_annual=12_000, thai_severance_enabled=True,
+                        thai_monthly_wage_thb=300_000, thai_employment_start_year=2005, thai_thb_per_gbp=44.0)
+        hh = _household(members=[member], savings=[SavingsContribution(name="S", annual_amount=50_000)])
+        plan = build_runway_plan(hh, 2033, current_year=CURRENT_YEAR)
+        idx = plan.years_until_retired
+        without = build_runway_plan(_household(members=[Person(name="A", age=54, social_security_annual=12_000)],
+                                               savings=hh.savings_contributions), 2033, current_year=CURRENT_YEAR)
+        assert plan.floor_by_year[idx] == pytest.approx(max(0.0, without.floor_by_year[idx] - plan.severance))
+        # A path with ample wealth must not register a floor breach in the severance year
+        result = run_runway(plan, MarketModel(), n_simulations=300, random_seed=1)
+        breach_years = result.time_to_floor_breach[np.isfinite(result.time_to_floor_breach)]
+        assert not np.any(breach_years == idx)

@@ -21,6 +21,10 @@ from fundedness.models.market import MarketModel
 from fundedness.models.simulation import SimulationConfig
 from fundedness.models.tax import TaxModel
 
+# Annual amount subtracted from every simulated return: costs + lower forward
+# expected returns than the 1970-2024 history. Stored as a positive fraction.
+DEFAULT_RETURN_HAIRCUT = 0.01
+
 _SAVE_DIR = Path(__file__).parent.parent / ".user_data"
 _SAVE_FILE = _SAVE_DIR / "session_state.json"
 
@@ -38,6 +42,7 @@ def _save_state():
         "retirement_year": st.session_state.get("retirement_year", 2033),
         "market_source": st.session_state.get("market_source", "uk"),
         "return_model": st.session_state.get("return_model", "lognormal"),
+        "return_haircut": st.session_state.get("return_haircut", DEFAULT_RETURN_HAIRCUT),
     }
     _SAVE_FILE.write_text(json.dumps(data, indent=2))
 
@@ -63,6 +68,7 @@ def _load_saved_state() -> bool:
         st.session_state.retirement_year = data.get("retirement_year", 2033)
         st.session_state.market_source = data.get("market_source", "uk")
         st.session_state.return_model = data.get("return_model", "lognormal")
+        st.session_state.return_haircut = data.get("return_haircut", DEFAULT_RETURN_HAIRCUT)
         return True
     except Exception:
         return False
@@ -172,6 +178,9 @@ def initialize_session_state():
     if "retirement_year" not in st.session_state:
         st.session_state.retirement_year = 2033
 
+    if "return_haircut" not in st.session_state:
+        st.session_state.return_haircut = DEFAULT_RETURN_HAIRCUT
+
     st.session_state.initialized = True
 
 
@@ -205,6 +214,20 @@ def get_tax_model() -> TaxModel:
     """Get the current UK tax model from session state."""
     initialize_session_state()
     return st.session_state.tax_model
+
+
+def get_return_haircut() -> float:
+    """Annual return haircut as a positive fraction (0.01 = 1%/yr)."""
+    initialize_session_state()
+    return float(st.session_state.get("return_haircut", DEFAULT_RETURN_HAIRCUT))
+
+
+def set_return_haircut(value: float):
+    """Store the return haircut and persist it."""
+    if st.session_state.get("return_haircut") != value:
+        st.session_state.return_haircut = value
+        st.session_state.simulation_result = None
+        _save_state()
 
 
 def get_simulation_config() -> SimulationConfig:
