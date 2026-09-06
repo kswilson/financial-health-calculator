@@ -19,7 +19,7 @@ from pathlib import Path
 # Add parent directory to path for imports when running on Streamlit Cloud
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from streamlit_app.utils.session_state import initialize_session_state
+from streamlit_app.utils.session_state import initialize_session_state, is_shared_deployment
 
 # Initialize session state
 initialize_session_state()
@@ -27,10 +27,18 @@ initialize_session_state()
 # Main page content
 st.title("📊 Pension Planner")
 
-st.markdown("""
-A personal retirement-runway model: will the portfolio last, given pensions, savings,
+shared_notice = (
+    "> **Your inputs live only in this browser tab.** Nothing is saved on the server. "
+    "Use *Download my full situation as JSON* on the Inputs page to keep them, and upload the file to continue later.\n"
+    if is_shared_deployment()
+    else ""
+)
+
+st.markdown(f"""
+A UK retirement-runway model: will the portfolio last, given pensions, savings,
 tax and uncertain markets?
 
+{shared_notice}
 ## Pages
 
 1. **📝 Inputs** — household members, assets, spending, pre-retirement savings, market assumptions
@@ -67,10 +75,10 @@ Everything is in **today's pounds** (real terms) — returns, spending and pensi
 inflation-adjusted, so a fixed (non-linked) DB pension shrinks over time and inflation-linked
 ones stay flat.
 
-- **Before retirement**: salary covers spending. Savings streams (and any pension already in
-  payment) flow into the portfolio. Rental income is a savings stream and stops at retirement —
-  the assumption is that the properties are sold to buy a home.
-- **At retirement**: any Thai severance is added to the portfolio.
+- **Before retirement**: salary covers ongoing spending. Savings streams (and any pension already in
+  payment) flow into the portfolio; they all stop at retirement. Dated one-off costs (university fees,
+  a car) are drawn from the portfolio in the years they fall.
+- **At retirement**: any lump sum you've enabled (e.g. Thai statutory severance) is added to the portfolio.
 - **After retirement**: State and DB pensions arrive first; the portfolio covers the rest,
   grossed up for UK income tax and CGT per person.
 - **Markets**: thousands of possible return histories, either resampled from actual UK/World

@@ -269,12 +269,13 @@ if years_until_retired > 0:
         f"Retirement in {retirement_year} ({years_until_retired} years). "
         f"Salary covers spending until then — no portfolio draws.{savings_msg}"
     )
-    st.warning(
-        "**Reminder:** rental income is entered as a pre-retirement savings stream, so it "
-        f"stops in {retirement_year}. This assumes the rental properties are sold at retirement "
-        "to buy somewhere to live — the sale proceeds and the new home are *not* in the portfolio. "
-        "If you keep a property and the rent continues, add it as pension-style income instead."
-    )
+    if any("rent" in s.name.lower() for s in household.savings_contributions):
+        st.warning(
+            "**Reminder:** rental income is entered as a pre-retirement savings stream, so it "
+            f"stops in {retirement_year}. That assumes the property is sold at retirement "
+            "(e.g. to buy somewhere to live) — the sale proceeds and the new home are *not* in the portfolio. "
+            "If you keep the property and the rent continues, add it as pension-style income instead."
+        )
 
 if plan.dated_liabilities:
     import datetime as _dt

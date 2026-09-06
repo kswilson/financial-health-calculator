@@ -21,6 +21,12 @@ The CEFR dashboard, Withdrawal Lab and Utility Optimization pages were removed b
 wired to the retirement-year / pension / tax model the runway uses. The CEFR, withdrawal and Merton
 library modules remain in the package but are not used by the app.
 
+Deployment: `streamlit_app/utils/session_state.py::is_shared_deployment()` switches off the local
+JSON persistence (which would otherwise be shared between every visitor) when `PENSION_PLANNER_SHARED`
+is set as an env var / Streamlit secret, or when the code lives under `/mount/src` (Streamlit Cloud).
+Default household values are a generic illustrative UK example — never put personal numbers there;
+local personal data lives in the gitignored `streamlit_app/.user_data/session_state.json`.
+
 Modelling assumptions worth knowing:
 - Everything is in real (today's £) terms; fixed DB pensions are deflated at 2.5%/yr.
 - Rental income is a pre-retirement savings stream and **stops at retirement** — the assumption is that

@@ -202,7 +202,7 @@ with tab1:
 
     # Household retirement year
     current_year = datetime.date.today().year
-    stored_ret_year = st.session_state.get("retirement_year", 2033)
+    stored_ret_year = st.session_state.get("retirement_year", current_year + 5)
     already_retired = st.checkbox(
         "Already retired",
         value=(stored_ret_year is None),
@@ -213,7 +213,7 @@ with tab1:
     else:
         st.session_state.retirement_year = st.number_input(
             "Planned Retirement Year",
-            value=stored_ret_year if stored_ret_year is not None else 2033,
+            value=stored_ret_year if stored_ret_year is not None else current_year + 5,
             min_value=current_year,
             max_value=current_year + 40,
             key="household_ret_year",
@@ -253,13 +253,12 @@ with tab1:
                 household.members.append(
                     Person(
                         name="Partner",
-                        date_of_birth=datetime.date(1975, 1, 1),
-                        age=51,
+                        age=55,
                         retirement_age=None,
                         life_expectancy=95,
                         social_security_age=67,
                         social_security_annual=11973,
-                        pension_annual=9500,
+                        pension_annual=0,
                         pension_start_age=60,
                         is_primary=False,
                     )
@@ -292,13 +291,14 @@ with tab_savings:
             f"Annual savings that flow into your portfolio until retirement ({retirement_yr}). "
             "These stop automatically at the retirement date."
         )
-        st.warning(
-            "**Rental income is modelled as a savings stream and stops at retirement.** "
-            "This assumes the rental properties are sold at retirement to buy somewhere to live, "
-            "so neither the sale proceeds nor the new home enter the portfolio. "
-            "If a property is kept and the rent continues into retirement, it should be entered "
-            "as pension-style income for the member instead."
-        )
+        if any("rent" in s.name.lower() for s in household.savings_contributions):
+            st.warning(
+                "**Rental income is modelled as a savings stream and stops at retirement.** "
+                "That's right if the property will be sold at retirement (e.g. to buy somewhere to live) — "
+                "neither the sale proceeds nor the new home enter the portfolio. "
+                "If the property is kept and the rent continues into retirement, enter it "
+                "as pension-style income for the member instead."
+            )
 
     member_names = [m.name for m in household.members]
     savings = list(household.savings_contributions)
@@ -610,7 +610,7 @@ with col_save:
         "household": _json.loads(household.model_dump_json()),
         "market_model": _json.loads(st.session_state.market_model.model_dump_json()),
         "tax_model": _json.loads(st.session_state.tax_model.model_dump_json()),
-        "retirement_year": st.session_state.get("retirement_year", 2033),
+        "retirement_year": st.session_state.get("retirement_year", None),
         "market_source": st.session_state.get("market_source", "uk"),
         "return_model": st.session_state.get("return_model", "lognormal"),
         "return_haircut": st.session_state.get("return_haircut", 0.01),

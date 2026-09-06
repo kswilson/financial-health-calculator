@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import os
 from pathlib import Path
 
 import streamlit as st
@@ -15,7 +16,7 @@ from fundedness.models.assets import (
     ConcentrationLevel,
     LiquidityClass,
 )
-from fundedness.models.household import Household, Person
+from fundedness.models.household import Household, Person, SavingsContribution
 from fundedness.models.liabilities import InflationLinkage, Liability, LiabilityType
 from fundedness.models.market import MarketModel
 from fundedness.models.simulation import SimulationConfig
@@ -29,8 +30,32 @@ _SAVE_DIR = Path(__file__).parent.parent / ".user_data"
 _SAVE_FILE = _SAVE_DIR / "session_state.json"
 
 
+def is_shared_deployment() -> bool:
+    """True when running somewhere other people use (e.g. Streamlit Community Cloud).
+
+    In that case inputs are kept in the browser session only and never written
+    to disk — the server filesystem would be shared between every visitor.
+    Detected via the PENSION_PLANNER_SHARED env var / secret, or the
+    /mount/src path Streamlit Cloud checks the repo out to.
+    """
+    if os.environ.get("PENSION_PLANNER_SHARED", "").lower() in ("1", "true", "yes"):
+        return True
+    try:
+        if str(st.secrets.get("PENSION_PLANNER_SHARED", "")).lower() in ("1", "true", "yes"):
+            return True
+    except Exception:
+        pass
+    return str(Path(__file__).resolve()).startswith("/mount/src")
+
+
+def default_retirement_year() -> int:
+    return datetime.date.today().year + 5
+
+
 def _save_state():
-    """Persist current inputs to a local JSON file."""
+    """Persist current inputs to a local JSON file (local runs only)."""
+    if is_shared_deployment():
+        return
     _SAVE_DIR.mkdir(parents=True, exist_ok=True)
     data = {
         "household": json.loads(st.session_state.household.model_dump_json()),
@@ -39,7 +64,7 @@ def _save_state():
         "simulation_config": json.loads(
             st.session_state.simulation_config.model_dump_json()
         ),
-        "retirement_year": st.session_state.get("retirement_year", 2033),
+        "retirement_year": st.session_state.get("retirement_year", default_retirement_year()),
         "market_source": st.session_state.get("market_source", "uk"),
         "return_model": st.session_state.get("return_model", "lognormal"),
         "return_haircut": st.session_state.get("return_haircut", DEFAULT_RETURN_HAIRCUT),
@@ -49,7 +74,7 @@ def _save_state():
 
 def _load_saved_state() -> bool:
     """Load persisted state if available. Returns True if loaded."""
-    if not _SAVE_FILE.exists():
+    if is_shared_deployment() or not _SAVE_FILE.exists():
         return False
     try:
         data = json.loads(_SAVE_FILE.read_text())
@@ -65,7 +90,7 @@ def _load_saved_state() -> bool:
         st.session_state.simulation_config = TypeAdapter(
             SimulationConfig
         ).validate_python(data["simulation_config"])
-        st.session_state.retirement_year = data.get("retirement_year", 2033)
+        st.session_state.retirement_year = data.get("retirement_year", default_retirement_year())
         st.session_state.market_source = data.get("market_source", "uk")
         st.session_state.return_model = data.get("return_model", "lognormal")
         st.session_state.return_haircut = data.get("return_haircut", DEFAULT_RETURN_HAIRCUT)
@@ -87,20 +112,19 @@ def initialize_session_state():
         st.session_state.initialized = True
         return
 
-    # Default person
+    # Illustrative default household — a generic UK example, deliberately not anyone's real numbers
     if "household" not in st.session_state:
         st.session_state.household = Household(
-            name="My Household",
+            name="Example Household",
             members=[
                 Person(
-                    name="Primary",
-                    date_of_birth=datetime.date(1972, 2, 18),
-                    age=54,
-                    retirement_age=None,  # Already retired
+                    name="You",
+                    age=55,
+                    retirement_age=None,
                     life_expectancy=95,
                     social_security_age=67,
-                    social_security_annual=11973,
-                    pension_annual=9500,
+                    social_security_annual=11973,  # full new State Pension, 2025/26
+                    pension_annual=0,
                     pension_start_age=60,
                     is_primary=True,
                 )
@@ -109,24 +133,32 @@ def initialize_session_state():
                 assets=[
                     Asset(
                         name="SIPP",
-                        value=220000,
+                        value=300000,
                         account_type=AccountType.SIPP,
                         asset_class=AssetClass.STOCKS,
                         liquidity_class=LiquidityClass.RETIREMENT,
                         concentration_level=ConcentrationLevel.DIVERSIFIED,
                     ),
                     Asset(
+                        name="Stocks & Shares ISA",
+                        value=150000,
+                        account_type=AccountType.ISA,
+                        asset_class=AssetClass.STOCKS,
+                        liquidity_class=LiquidityClass.TAXABLE_INDEX,
+                        concentration_level=ConcentrationLevel.DIVERSIFIED,
+                    ),
+                    Asset(
                         name="General Investment Account",
-                        value=250000,
+                        value=100000,
                         account_type=AccountType.GENERAL,
                         asset_class=AssetClass.STOCKS,
                         liquidity_class=LiquidityClass.TAXABLE_INDEX,
                         concentration_level=ConcentrationLevel.DIVERSIFIED,
-                        cost_basis=150000,
+                        cost_basis=70000,
                     ),
                     Asset(
                         name="Cash Savings",
-                        value=20000,
+                        value=25000,
                         account_type=AccountType.TAXABLE,
                         asset_class=AssetClass.CASH,
                         liquidity_class=LiquidityClass.CASH,
@@ -138,17 +170,20 @@ def initialize_session_state():
                 Liability(
                     name="Essential Living Expenses",
                     liability_type=LiabilityType.ESSENTIAL_SPENDING,
-                    annual_amount=50000,
+                    annual_amount=26000,
                     is_essential=True,
                     inflation_linkage=InflationLinkage.CPI,
                 ),
                 Liability(
                     name="Discretionary Spending",
                     liability_type=LiabilityType.DISCRETIONARY_SPENDING,
-                    annual_amount=20000,
+                    annual_amount=8000,
                     is_essential=False,
                     inflation_linkage=InflationLinkage.CPI,
                 ),
+            ],
+            savings_contributions=[
+                SavingsContribution(name="Pension & ISA contributions", annual_amount=25000, growth_rate=0.0),
             ],
         )
 
@@ -176,7 +211,7 @@ def initialize_session_state():
         st.session_state.comparison_result = None
 
     if "retirement_year" not in st.session_state:
-        st.session_state.retirement_year = 2033
+        st.session_state.retirement_year = default_retirement_year()
 
     if "return_haircut" not in st.session_state:
         st.session_state.return_haircut = DEFAULT_RETURN_HAIRCUT
