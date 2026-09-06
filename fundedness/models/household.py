@@ -223,24 +223,26 @@ class Household(BaseModel):
         return self.balance_sheet.total_value
 
     @property
+    def ongoing_liabilities(self) -> list[Liability]:
+        """Spending that starts now and runs for life (excludes dated one-off costs)."""
+        return [l for l in self.liabilities if l.start_year == 0 and l.end_year is None]
+
+    @property
+    def dated_liabilities(self) -> list[Liability]:
+        """Costs with a start and/or end year (e.g. university fees)."""
+        return [l for l in self.liabilities if not (l.start_year == 0 and l.end_year is None)]
+
+    @property
     def essential_spending(self) -> float:
-        """Total annual essential spending."""
-        return sum(
-            liability.annual_amount
-            for liability in self.liabilities
-            if liability.is_essential
-        )
+        """Annual essential spending that runs for life (dated one-offs excluded)."""
+        return sum(l.annual_amount for l in self.ongoing_liabilities if l.is_essential)
 
     @property
     def discretionary_spending(self) -> float:
-        """Total annual discretionary spending."""
-        return sum(
-            liability.annual_amount
-            for liability in self.liabilities
-            if not liability.is_essential
-        )
+        """Annual discretionary spending that runs for life (dated one-offs excluded)."""
+        return sum(l.annual_amount for l in self.ongoing_liabilities if not l.is_essential)
 
     @property
     def total_spending(self) -> float:
-        """Total annual spending target."""
+        """Annual ongoing spending target (dated one-offs excluded)."""
         return self.essential_spending + self.discretionary_spending

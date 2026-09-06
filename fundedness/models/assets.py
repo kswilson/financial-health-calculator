@@ -59,7 +59,7 @@ class Asset(BaseModel):
         default=None,
         description="Owner's name (for multi-person households, None = primary)",
     )
-    value: float = Field(..., ge=0, description="Current market value")
+    value: float = Field(..., description="Current market value (negative for obligations like fees)")
     account_type: AccountType = Field(
         default=AccountType.TAXABLE,
         description="Tax treatment of the account",

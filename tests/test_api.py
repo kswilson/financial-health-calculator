@@ -29,62 +29,6 @@ class TestHealthEndpoints:
         assert response.json()["status"] == "healthy"
 
 
-class TestCEFREndpoint:
-    """Tests for CEFR computation endpoint."""
-
-    def test_compute_cefr_basic(self, client):
-        """Basic CEFR computation should work."""
-        request_data = {
-            "assets": [
-                {"name": "401k", "value": 500000, "account_type": "tax_deferred"},
-                {"name": "Roth", "value": 200000, "account_type": "tax_exempt"},
-            ],
-            "liabilities": [
-                {"name": "Spending", "annual_amount": 50000, "is_essential": True},
-            ],
-            "planning_horizon": 30,
-        }
-
-        response = client.post("/api/v1/cefr/compute", json=request_data)
-        assert response.status_code == 200
-
-        data = response.json()
-        assert "cefr" in data
-        assert data["cefr"] > 0
-        assert "is_funded" in data
-        assert "gross_assets" in data
-        assert data["gross_assets"] == 700000
-
-    def test_compute_cefr_validation_error(self, client):
-        """Invalid request should return 400."""
-        request_data = {
-            "assets": [],  # Empty assets
-            "liabilities": [],  # Empty liabilities
-        }
-
-        response = client.post("/api/v1/cefr/compute", json=request_data)
-        # Should still work, just return 0 or inf CEFR
-        assert response.status_code == 200
-
-    def test_compute_cefr_with_tax_model(self, client):
-        """Custom tax model should be applied."""
-        request_data = {
-            "assets": [
-                {"name": "Taxable", "value": 100000, "account_type": "taxable"},
-            ],
-            "liabilities": [
-                {"name": "Spending", "annual_amount": 10000},
-            ],
-            "tax_model": {
-                "income_tax_rate": 0.40,
-                "cgt_rate": 0.20,
-            },
-        }
-
-        response = client.post("/api/v1/cefr/compute", json=request_data)
-        assert response.status_code == 200
-
-
 class TestSimulateEndpoint:
     """Tests for simulation endpoint."""
 

@@ -133,11 +133,13 @@ def generate_returns(
         # Standard normal
         z = rng.standard_normal((n_simulations, n_years))
 
-    # Convert to returns (log-normal model)
-    # r = μ - σ²/2 + σ*z  (continuous compounding adjustment)
-    returns = portfolio_return - portfolio_vol**2 / 2 + portfolio_vol * z
+    # Log-normal model: portfolio_return is a geometric (compound) mean, so the
+    # log return has mean ln(1 + μ) and the simple return is exp(r) - 1.
+    # (Subtracting σ²/2 here and applying arithmetically double-counted the
+    # volatility drag, understating the geometric mean by ~1%/yr.)
+    log_returns = np.log1p(portfolio_return) + portfolio_vol * z
 
-    return returns
+    return np.expm1(log_returns)
 
 
 def run_simulation(
@@ -147,6 +149,7 @@ def run_simulation(
     stock_weight: float | np.ndarray = 0.6,
     spending_floor: float | np.ndarray | None = None,
     inflation_rate: float = 0.0,
+    return_shift: float = 0.0,
 ) -> SimulationResult:
     """Run Monte Carlo simulation of retirement portfolio.
 
@@ -161,6 +164,8 @@ def run_simulation(
         stock_weight: Allocation to stocks (constant or array by year)
         spending_floor: Minimum acceptable spending in real terms (constant or array by year)
         inflation_rate: Nominal inflation adjustment (default 0 — real terms)
+        return_shift: Added to every year's return (e.g. -0.01 for a 1%/yr haircut);
+            works for both bootstrap and parametric models
 
     Returns:
         SimulationResult with all paths and metrics
@@ -214,6 +219,8 @@ def run_simulation(
             stock_weight=avg_stock_weight,
             random_seed=seed,
         )
+    if return_shift:
+        returns = returns + return_shift
 
     # Initialize paths
     wealth_paths = np.zeros((n_sim, n_years + 1))

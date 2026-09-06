@@ -7,8 +7,6 @@ from fundedness.models.assets import (
     Asset,
     AssetClass,
     BalanceSheet,
-    ConcentrationLevel,
-    LiquidityClass,
 )
 
 
@@ -40,7 +38,10 @@ def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | N
     if assets:
         for i, asset in enumerate(assets):
             owner_label = f" ({asset.owner})" if show_owner and asset.owner else ""
-            with st.expander(f"{asset.name}{owner_label} - £{asset.value:,.0f}", expanded=False):
+            # Keep the value out of the title: Streamlit identifies an expander by its
+            # label, so a label that changes on edit would re-collapse it on every rerun.
+            with st.expander(f"{asset.name}{owner_label}", expanded=False):
+                st.caption(f"Current value: £{asset.value:,.0f}")
                 # Owner selector for couples
                 new_owner = asset.owner
                 if show_owner:
@@ -64,7 +65,6 @@ def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | N
                     new_value = st.number_input(
                         "Value (£)",
                         value=int(asset.value),
-                        min_value=0,
                         step=10000,
                         key=f"asset_value_{i}",
                     )
@@ -84,30 +84,17 @@ def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | N
                         format_func=lambda x: x.value.replace("_", " ").title(),
                         key=f"asset_class_{i}",
                     )
-                    new_liquidity = st.selectbox(
-                        "Liquidity",
-                        options=list(LiquidityClass),
-                        index=list(LiquidityClass).index(asset.liquidity_class),
-                        format_func=lambda x: x.value.replace("_", " ").title(),
-                        key=f"asset_liquidity_{i}",
-                    )
-                    new_concentration = st.selectbox(
-                        "Concentration",
-                        options=list(ConcentrationLevel),
-                        index=list(ConcentrationLevel).index(asset.concentration_level),
-                        format_func=lambda x: x.value.replace("_", " ").title(),
-                        key=f"asset_concentration_{i}",
-                    )
 
-                # Cost basis for taxable accounts
+                # Cost basis for taxable accounts (drives CGT on GIA withdrawals)
                 new_cost_basis = None
-                if new_account_type in (AccountType.TAXABLE, AccountType.GENERAL):
+                if new_account_type in (AccountType.TAXABLE, AccountType.GENERAL) and new_value > 0:
                     new_cost_basis = st.number_input(
                         "Cost Basis (£)",
                         value=int(asset.cost_basis or asset.value * 0.5),
                         min_value=0,
                         step=10000,
                         key=f"asset_basis_{i}",
+                        help="What you paid. Gains above this are subject to CGT when drawn.",
                     )
 
                 # Update asset
@@ -117,8 +104,6 @@ def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | N
                     value=float(new_value),
                     account_type=new_account_type,
                     asset_class=new_asset_class,
-                    liquidity_class=new_liquidity,
-                    concentration_level=new_concentration,
                     cost_basis=float(new_cost_basis) if new_cost_basis else None,
                 )
 
@@ -137,8 +122,6 @@ def render_asset_editor(balance_sheet: BalanceSheet, member_names: list[str] | N
                 value=100000,
                 account_type=AccountType.TAXABLE,
                 asset_class=AssetClass.STOCKS,
-                liquidity_class=LiquidityClass.TAXABLE_INDEX,
-                concentration_level=ConcentrationLevel.DIVERSIFIED,
             )
         )
         _save_balance_sheet(assets)

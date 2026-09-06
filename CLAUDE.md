@@ -11,6 +11,26 @@ This is a Python financial planning toolkit that implements:
 
 The project includes both a Python package (`fundedness/`) and a Streamlit web application (`streamlit_app/`).
 
+### This fork
+
+This is a **private personal fork** used as a UK pension planner (see `background_information.md`).
+The Streamlit app is deliberately reduced to three pages — **Inputs**, **Time Runway**, **Sensitivity** —
+all driven by `fundedness/runway.py`, which builds the year-by-year schedules (pensions, pre-retirement
+savings, Thai severance, per-person UK tax gross-up of portfolio draws) and runs the Monte Carlo engine.
+The CEFR dashboard, Withdrawal Lab and Utility Optimization pages were removed because they were not
+wired to the retirement-year / pension / tax model the runway uses. The CEFR, withdrawal and Merton
+library modules remain in the package but are not used by the app.
+
+Modelling assumptions worth knowing:
+- Everything is in real (today's £) terms; fixed DB pensions are deflated at 2.5%/yr.
+- Rental income is a pre-retirement savings stream and **stops at retirement** — the assumption is that
+  the rental properties are sold to buy a home (proceeds and home are outside the portfolio).
+- Spending entries (`Liability`) with `start_year == 0` and no `end_year` are *ongoing* and covered by
+  salary until retirement; anything dated (e.g. university fees) is drawn from the portfolio in the years
+  it falls, before or after retirement. Prefer a dated liability over a negative asset for future outflows.
+- Portfolio draws are split equally between household members and taxed with UK bands via `TaxModel`;
+  the SIPP/GIA/cash mix of each withdrawal follows today's balance-sheet composition.
+
 ## Development Status
 
 This project is **actively developed** and published on PyPI as `fundedness`.
@@ -37,6 +57,7 @@ fundedness/
 ├── liquidity.py         # Liquidity factor adjustments
 ├── risk.py              # Reliability/concentration haircuts
 ├── simulate.py          # Monte Carlo engine with utility tracking
+├── runway.py            # Time Runway plan builder (schedules + per-person UK tax) — drives the app
 ├── merton.py            # Merton optimal formulas (allocation, spending, CE return)
 ├── optimize.py          # Parametric policy optimization
 ├── policies.py          # Spending/allocation policy interface

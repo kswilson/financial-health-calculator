@@ -1,13 +1,13 @@
 """Main Streamlit application entry point.
 
-Financial Health Calculator - A comprehensive retirement planning toolkit.
+Pension planner — Time Runway Monte Carlo projections for a UK household.
 """
 
 import streamlit as st
 
 # Page config must be first Streamlit command
 st.set_page_config(
-    page_title="Financial Health Calculator",
+    page_title="Pension Planner",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -25,83 +25,59 @@ from streamlit_app.utils.session_state import initialize_session_state
 initialize_session_state()
 
 # Main page content
-st.title("📊 Financial Health Calculator")
+st.title("📊 Pension Planner")
 
 st.markdown("""
-Welcome to the **Financial Health Calculator**, a comprehensive retirement planning toolkit.
+A personal retirement-runway model: will the portfolio last, given pensions, savings,
+tax and uncertain markets?
 
-This application helps you:
-- **Calculate your CEFR** (Certainty-Equivalent Funded Ratio) - understand how well-funded your retirement is
-- **Run Monte Carlo simulations** - see the range of possible outcomes
-- **Compare withdrawal strategies** - find the approach that works best for you
-- **Analyze sensitivity** - understand which factors matter most
+## Pages
 
-## Getting Started
-
-Use the sidebar to navigate between pages:
-
-1. **📝 Inputs** - Enter your assets, spending, and assumptions
-2. **📊 CEFR Dashboard** - See your fundedness ratio and breakdown
-3. **📈 Time Runway** - View Monte Carlo projections
-4. **💰 Withdrawal Lab** - Compare withdrawal strategies
-5. **🎯 Sensitivity** - Understand key risk factors
+1. **📝 Inputs** — household members, assets, spending, pre-retirement savings, market assumptions
+2. **📈 Time Runway** — Monte Carlo projection of the portfolio, spending and funding sources
+3. **🎯 Sensitivity** — which inputs move the success rate, and how much you can spend
 
 ## Quick Overview
-
 """)
 
 # Show quick summary from session state
 household = st.session_state.household
+retirement_year = st.session_state.get("retirement_year", None)
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric(
-        "Total Assets",
-        f"£{household.total_assets:,.0f}",
-    )
+    st.metric("Total Assets", f"£{household.total_assets:,.0f}")
 
 with col2:
-    st.metric(
-        "Annual Spending Target",
-        f"£{household.total_spending:,.0f}",
-    )
+    st.metric("Annual Spending Target", f"£{household.total_spending:,.0f}")
 
 with col3:
-    if household.primary_member:
-        st.metric(
-            "Planning Horizon",
-            f"{household.planning_horizon} years",
-        )
+    st.metric("Retirement", str(retirement_year) if retirement_year else "Already retired")
+
+with col4:
+    st.metric("Planning Horizon", f"{household.planning_horizon} years")
 
 st.markdown("---")
 
 st.markdown("""
-## Key Concepts
+## How the Model Works
 
-### CEFR (Certainty-Equivalent Funded Ratio)
+Everything is in **today's pounds** (real terms) — returns, spending and pensions are all
+inflation-adjusted, so a fixed (non-linked) DB pension shrinks over time and inflation-linked
+ones stay flat.
 
-CEFR measures how well-funded your retirement is after accounting for:
-- **Taxes** - What you'll owe when withdrawing from different accounts
-- **Liquidity** - How easily you can access your assets
-- **Reliability** - Risk from concentrated positions
+- **Before retirement**: salary covers spending. Savings streams (and any pension already in
+  payment) flow into the portfolio. Rental income is a savings stream and stops at retirement —
+  the assumption is that the properties are sold to buy a home.
+- **At retirement**: any Thai severance is added to the portfolio.
+- **After retirement**: State and DB pensions arrive first; the portfolio covers the rest,
+  grossed up for UK income tax and CGT per person.
+- **Markets**: thousands of possible return histories, either resampled from actual UK/World
+  history or drawn from a log-normal model, give the range of outcomes (P10 / P50 / P90).
 
-**CEFR ≥ 1.0** means your assets can cover your planned spending.
-
-### Monte Carlo Simulation
-
-Instead of assuming fixed returns, we simulate thousands of possible market scenarios to show:
-- The range of possible outcomes (P10, P50, P90)
-- Probability of running out of money
-- Probability of falling below essential spending
-
-### Withdrawal Strategies
-
-Different approaches to deciding how much to spend each year:
-- **Fixed SWR** - Traditional 4% rule
-- **Guardrails** - Adjust spending based on portfolio performance
-- **VPW** - Variable percentage based on age
-- **RMD-Style** - Following IRS distribution tables
+**Success rate** is the share of those histories where the portfolio never runs out.
+**Floor breach rate** is the share where spending has to fall below the essential floor.
 """)
 
 # Footer
@@ -109,5 +85,5 @@ st.markdown("---")
 st.markdown(
     "*Built with [Streamlit](https://streamlit.io) and "
     "[Plotly](https://plotly.com). "
-    "This tool is for educational purposes only and does not constitute financial advice.*"
+    "This tool is for personal planning only and does not constitute financial advice.*"
 )

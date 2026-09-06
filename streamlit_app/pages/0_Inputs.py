@@ -37,7 +37,7 @@ tab1, tab2, tab_savings, tab3, tab4 = st.tabs([
     "👤 Personal Info",
     "💰 Assets",
     "💷 Pre-Retirement Savings",
-    "📋 Spending",
+    "📋 Spending & One-offs",
     "⚙️ Assumptions",
 ])
 
@@ -292,6 +292,13 @@ with tab_savings:
             f"Annual savings that flow into your portfolio until retirement ({retirement_yr}). "
             "These stop automatically at the retirement date."
         )
+        st.warning(
+            "**Rental income is modelled as a savings stream and stops at retirement.** "
+            "This assumes the rental properties are sold at retirement to buy somewhere to live, "
+            "so neither the sale proceeds nor the new home enter the portfolio. "
+            "If a property is kept and the rent continues into retirement, it should be entered "
+            "as pension-style income for the member instead."
+        )
 
     member_names = [m.name for m in household.members]
     savings = list(household.savings_contributions)
@@ -300,7 +307,8 @@ with tab_savings:
     if savings:
         for i, s in enumerate(savings):
             owner_label = f" ({s.member_name})" if s.member_name and len(member_names) > 1 else ""
-            with st.expander(f"{s.name}{owner_label} — £{s.annual_amount:,.0f}/yr", expanded=False):
+            with st.expander(f"{s.name}{owner_label}", expanded=False):
+                st.caption(f"£{s.annual_amount:,.0f}/yr")
                 col1, col2 = st.columns(2)
                 with col1:
                     new_name = st.text_input("Description", value=s.name, key=f"sav_name_{i}")
@@ -564,7 +572,7 @@ with tab4:
         )
         st.caption("Basic rate: 18% / Higher rate: 24% (2025/26)")
 
-    # Store base tax model (per-person models are built in compute_cefr)
+    # Store base tax model (per-person stacking is done in fundedness.runway)
     st.session_state.tax_model = TaxModel(
         personal_allowance=float(personal_allowance),
         cgt_annual_exempt=float(cgt_annual_exempt),

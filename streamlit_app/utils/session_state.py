@@ -76,7 +76,6 @@ def initialize_session_state():
     # Try loading from saved state first
     if _load_saved_state():
         # Caches
-        st.session_state.cefr_result = None
         st.session_state.simulation_result = None
         st.session_state.comparison_result = None
         st.session_state.initialized = True
@@ -162,10 +161,6 @@ def initialize_session_state():
             n_years=40,
         )
 
-    # CEFR result cache
-    if "cefr_result" not in st.session_state:
-        st.session_state.cefr_result = None
-
     # Simulation result cache
     if "simulation_result" not in st.session_state:
         st.session_state.simulation_result = None
@@ -189,7 +184,6 @@ def get_household() -> Household:
 def update_household(household: Household):
     """Update the household in session state and clear caches."""
     st.session_state.household = household
-    st.session_state.cefr_result = None
     st.session_state.simulation_result = None
     _save_state()
 
@@ -207,6 +201,12 @@ def update_market_model(market_model: MarketModel):
     _save_state()
 
 
+def get_tax_model() -> TaxModel:
+    """Get the current UK tax model from session state."""
+    initialize_session_state()
+    return st.session_state.tax_model
+
+
 def get_simulation_config() -> SimulationConfig:
     """Get the current simulation config from session state."""
     initialize_session_state()
@@ -215,6 +215,5 @@ def get_simulation_config() -> SimulationConfig:
 
 def clear_all_caches():
     """Clear all cached results."""
-    st.session_state.cefr_result = None
     st.session_state.simulation_result = None
     st.session_state.comparison_result = None
